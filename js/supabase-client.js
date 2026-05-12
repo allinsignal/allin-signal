@@ -64,6 +64,17 @@ async function topSignals(limit = 10) {
   return data || [];
 }
 
+async function allSignals(limit = 500) {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('signals')
+    .select('*')
+    .order('confidence', { ascending: false })
+    .limit(limit);
+  if (error) { console.warn('allSignals:', error); return []; }
+  return data || [];
+}
+
 async function searchSignal(ticker) {
   if (!supabase) return null;
   const { data } = await supabase
@@ -122,7 +133,7 @@ window.allin = {
   supabase,
   isConfigured,
   signUp, signIn, signOut, currentUser, currentProfile,
-  topSignals, searchSignal,
+  topSignals, allSignals, searchSignal,
   getWatchlist, addToWatchlist, removeFromWatchlist, toggleAlerts,
   recentChanges,
 };

@@ -1035,7 +1035,89 @@
 </script>
 
 <script>
-  // ---- Supabase: replace top 10 with real data when backend is ready ----
+  // ---- Member unlock ----
+  function unlockMember() {
+    // Hide paywall overlay
+    const pw = document.querySelector('.paywall');
+    if (pw) pw.style.display = 'none';
+
+    // Hide topbar subscribe button, show member badge
+    const topUpgradeBtn = document.getElementById('topUpgrade');
+    if (topUpgradeBtn) {
+      topUpgradeBtn.textContent = '✓ Member';
+      topUpgradeBtn.style.background = 'var(--accent-soft)';
+      topUpgradeBtn.style.color = 'var(--accent)';
+      topUpgradeBtn.onclick = null;
+    }
+
+    // Enable search bar
+    const searchInput = document.getElementById('lockedSearch');
+    const searchWrap = searchInput?.closest('.search-locked');
+    if (searchInput) {
+      searchInput.removeAttribute('readonly');
+      searchInput.style.cursor = 'text';
+    }
+    const lockTag = searchWrap?.querySelector('.lock-tag');
+    if (lockTag) lockTag.style.display = 'none';
+
+    // Wire search
+    if (searchInput) {
+      searchInput.addEventListener('keydown', async (e) => {
+        if (e.key !== 'Enter') return;
+        const ticker = searchInput.value.trim().toUpperCase();
+        if (!ticker) return;
+        const sig = await window.allin.searchSignal(ticker);
+        if (sig) {
+          const s = {
+            t: sig.ticker, n: sig.company_name || sig.ticker,
+            price: Number(sig.price), ema: Number(sig.trend_base ?? sig.price),
+            chg: Number(sig.weekly_change ?? 0), mcap: sig.market_cap_band || 'Mid',
+          };
+          openDrawer(s, 0);
+        } else {
+          searchInput.value = '';
+          searchInput.placeholder = `"${ticker}" not found — try another`;
+          setTimeout(() => { searchInput.placeholder = 'Search any ticker — AAPL, MSFT, NVDA, BRK.B…'; }, 2500);
+        }
+      });
+    }
+  }
+
+  async function loadMemberTable(rows) {
+    const tbl = document.getElementById('lockedTable');
+    // Clear placeholder rows (keep header)
+    const head = tbl.querySelector('.lt-head');
+    tbl.innerHTML = '';
+    if (head) tbl.appendChild(head);
+    rows.forEach((r, i) => {
+      const p = Number(r.price), e = Number(r.trend_base ?? r.price);
+      const distRaw = e > 0 ? (p - e) / e * 100 : 0;
+      const isBuy = r.rating === 'BUY';
+      const conf = Number(r.confidence ?? 0);
+      const row = document.createElement('div');
+      row.className = 'lt-row';
+      row.style.cursor = 'pointer';
+      row.innerHTML = `
+        <div class="mono" style="color:var(--fg-2)">#${String(11 + i).padStart(2, '0')}</div>
+        <div class="ticker">
+          <div class="sc-logo" style="background:${hashColor(r.ticker)};color:var(--logo-fg)">${r.ticker.slice(0, 2)}</div>
+          <div class="name-block"><b class="mono">${r.ticker}</b><span>${r.company_name || r.ticker}</span></div>
+        </div>
+        <div class="right mono">$${p.toFixed(2)}</div>
+        <div class="right mono" style="color:var(--fg-1)">$${e.toFixed(2)}</div>
+        <div class="right mono hide-sm ${isBuy ? 'delta-buy' : 'delta-sell'}">${distRaw >= 0 ? '+' : ''}${distRaw.toFixed(2)}%</div>
+        <div class="right mono hide-sm ${isBuy ? 'delta-buy' : 'delta-sell'}">—</div>
+        <div class="hide-sm">${isBuy ? '<span class="pill-buy">Buy</span>' : '<span class="pill-sell">Sell</span>'}</div>
+        <div class="hide-sm"><div class="lt-bar"><div class="lt-bar-fill${isBuy ? '' : ' sell'}" style="width:${Math.round(conf * 100)}%"></div></div></div>`;
+      const s = { t: r.ticker, n: r.company_name || r.ticker, price: p, ema: e, chg: 0, mcap: 'Mid' };
+      row.addEventListener('click', () => openDrawer(s, 11 + i));
+      tbl.appendChild(row);
+    });
+    const buyCount = document.getElementById('buyCount');
+    if (buyCount) buyCount.textContent = rows.length.toLocaleString() + '+';
+  }
+
+  // ---- Supabase: load real data and check membership ----
   window.addEventListener('allin:ready', async () => {
     if (!window.allin?.isConfigured) return;
     try {
@@ -1051,20 +1133,24 @@
         chg: Number(r.weekly_change ?? 0),
         mcap: r.market_cap_band || 'Mid',
       }));
-
       renderGrid();
 
-      // Update hero stats from DB
       const buyEl = document.getElementById('statBuy');
-      const sellEl = document.getElementById('statSell');
-      const buyCount = document.getElementById('buyCount');
-      if (buyEl && rows.length) {
-        // Supabase signals table has counts; use what we have
-        buyEl.textContent = rows.length.toLocaleString();
-        if (buyCount) buyCount.textContent = rows.length.toLocaleString();
-      }
+      if (buyEl) buyEl.textContent = rows.length.toLocaleString();
     } catch(err) {
       console.warn('Supabase fetch failed, showing demo data:', err);
+    }
+
+    // Check subscription status
+    try {
+      const profile = await window.allin.currentProfile();
+      if (profile?.is_subscribed) {
+        unlockMember();
+        const memberRows = await window.allin.allSignals(200);
+        if (memberRows?.length) loadMemberTable(memberRows);
+      }
+    } catch(err) {
+      console.warn('Profile check failed:', err);
     }
   });
 </script>
