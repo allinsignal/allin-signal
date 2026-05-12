@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Methodology — Allin Signal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root, [data-theme="dark"] {
+    --bg-0: oklch(0.16 0.008 250);
+    --bg-1: oklch(0.20 0.010 250);
+    --bg-2: oklch(0.235 0.011 250);
+    --bg-3: oklch(0.27 0.012 250);
+    --line: oklch(0.32 0.012 250);
+    --line-soft: oklch(0.26 0.010 250);
+    --fg-0: oklch(0.97 0.005 250);
+    --fg-1: oklch(0.78 0.010 250);
+    --fg-2: oklch(0.58 0.012 250);
+    --fg-3: oklch(0.42 0.012 250);
+    --buy: oklch(0.80 0.17 150);
+    --buy-soft: oklch(0.80 0.17 150 / 0.12);
+    --sell: oklch(0.68 0.21 25);
+    --sell-soft: oklch(0.68 0.21 25 / 0.12);
+    --accent: oklch(0.78 0.14 220);
+    --accent-soft: oklch(0.78 0.14 220 / 0.14);
+    --warn: oklch(0.82 0.15 85);
+    --warn-soft: oklch(0.82 0.15 85 / 0.14);
+    --logo-fg: var(--bg-0);
+    --topbar-bg: oklch(0.16 0.008 250 / 0.85);
+  }
+  [data-theme="light"] {
+    --bg-0: oklch(0.985 0.003 250);
+    --bg-1: oklch(1 0 0);
+    --bg-2: oklch(0.965 0.005 250);
+    --bg-3: oklch(0.93 0.008 250);
+    --line: oklch(0.86 0.008 250);
+    --line-soft: oklch(0.92 0.006 250);
+    --fg-0: oklch(0.20 0.010 250);
+    --fg-1: oklch(0.36 0.012 250);
+    --fg-2: oklch(0.52 0.014 250);
+    --fg-3: oklch(0.68 0.012 250);
+    --buy: oklch(0.58 0.17 150);
+    --buy-soft: oklch(0.58 0.17 150 / 0.10);
+    --sell: oklch(0.58 0.22 25);
+    --sell-soft: oklch(0.58 0.22 25 / 0.10);
+    --accent: oklch(0.55 0.18 240);
+    --accent-soft: oklch(0.55 0.18 240 / 0.10);
+    --warn: oklch(0.55 0.16 75);
+    --warn-soft: oklch(0.55 0.16 75 / 0.12);
+    --logo-fg: oklch(0.99 0 0);
+    --topbar-bg: oklch(0.985 0.003 250 / 0.85);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg-0); color: var(--fg-0); font-family: 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; font-feature-settings: 'tnum'; font-variant-numeric: tabular-nums; }
+  a { color: inherit; text-decoration: none; }
+  button { font-family: inherit; cursor: pointer; border: 0; background: transparent; color: inherit; }
+
+  /* Topbar (matches home) */
+  .topbar { position: sticky; top: 0; z-index: 50; height: 56px; display: flex; align-items: center; padding: 0 20px; gap: 24px; background: var(--topbar-bg); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line-soft); }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: 0.02em; }
+  .brand-mark { width: 32px; height: 32px; background: url('assets/allin-logo.png') center/contain no-repeat; font-weight: 800; font-size: 13px; }
+  .brand-name { font-size: 15px; }
+  .brand-name span { color: var(--fg-2); font-weight: 500; }
+  .nav { display: flex; gap: 4px; margin-left: 8px; }
+  .nav a { padding: 8px 12px; border-radius: 6px; font-size: 13px; color: var(--fg-1); }
+  .nav a.active { color: var(--fg-0); background: var(--bg-2); }
+  .nav a:hover:not(.active) { color: var(--fg-0); }
+  .topbar-right { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+  .btn-ghost { padding: 7px 12px; border-radius: 6px; font-size: 13px; color: var(--fg-1); border: 1px solid var(--line-soft); }
+  .btn-primary { padding: 7px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; color: var(--logo-fg); background: var(--buy); }
+
+  /* Page */
+  .page { max-width: 880px; margin: 0 auto; padding: 56px 28px 80px; }
+  .eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--accent); font-weight: 600; margin-bottom: 14px; }
+  h1 { font-size: 44px; line-height: 1.05; letter-spacing: -0.02em; margin: 0 0 16px; font-weight: 700; text-wrap: balance; }
+  .lede { font-size: 18px; line-height: 1.55; color: var(--fg-1); margin: 0 0 36px; max-width: 720px; }
+
+  .callout { display: flex; gap: 14px; padding: 18px 20px; border-radius: 12px; background: var(--warn-soft); border: 1px solid var(--warn-soft); margin-bottom: 40px; }
+  .callout .icon { width: 32px; height: 32px; flex: none; border-radius: 8px; background: oklch(0 0 0 / 0.12); color: var(--warn); display: grid; place-items: center; }
+  [data-theme="light"] .callout .icon { background: oklch(1 0 0 / 0.6); }
+  .callout b { display: block; color: var(--fg-0); font-size: 14px; margin-bottom: 4px; }
+  .callout span { font-size: 13.5px; color: var(--fg-1); line-height: 1.5; }
+
+  h2 { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; margin: 40px 0 12px; }
+  p { font-size: 15px; line-height: 1.65; color: var(--fg-1); margin: 0 0 14px; max-width: 720px; }
+  p strong { color: var(--fg-0); font-weight: 600; }
+
+  .who-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 18px 0 22px; }
+  .who-card { padding: 18px 20px; border-radius: 12px; border: 1px solid var(--line-soft); background: var(--bg-1); }
+  .who-card.yes { border-color: var(--buy-soft); }
+  .who-card.no  { border-color: var(--sell-soft); }
+  .who-tag { display: inline-flex; align-items: center; gap: 6px; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; padding: 3px 8px; border-radius: 5px; margin-bottom: 10px; }
+  .who-tag.yes { color: var(--buy); background: var(--buy-soft); }
+  .who-tag.no  { color: var(--sell); background: var(--sell-soft); }
+  .who-card ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+  .who-card li { font-size: 13.5px; color: var(--fg-1); display: flex; gap: 10px; align-items: flex-start; line-height: 1.5; }
+  .who-card .check { color: var(--buy); flex: none; margin-top: 3px; }
+  .who-card .x     { color: var(--sell); flex: none; margin-top: 3px; }
+
+  .principles { display: grid; gap: 1px; background: var(--line-soft); border: 1px solid var(--line-soft); border-radius: 12px; overflow: hidden; margin: 18px 0; }
+  .principle { background: var(--bg-1); padding: 18px 20px; }
+  .principle b { display: block; font-size: 14px; margin-bottom: 4px; }
+  .principle span { font-size: 13.5px; color: var(--fg-1); line-height: 1.55; }
+
+  .no-ai {
+    margin: 30px 0;
+    padding: 26px 28px;
+    background: linear-gradient(135deg, var(--buy-soft) 0%, oklch(0.20 0.010 250 / 0) 100%);
+    border: 1px solid var(--buy);
+    border-radius: 14px;
+    display: grid;
+    grid-template-columns: 56px 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+  [data-theme="light"] .no-ai { background: linear-gradient(135deg, var(--buy-soft) 0%, oklch(1 0 0 / 0) 100%); }
+  .no-ai-icon { width: 56px; height: 56px; border-radius: 14px; background: var(--buy); color: var(--logo-fg); display: grid; place-items: center; }
+  .no-ai-eyebrow { font-size: 10.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--buy); margin-bottom: 6px; }
+  .no-ai-title { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 10px; color: var(--fg-0); }
+  .no-ai-body { font-size: 14px; line-height: 1.6; color: var(--fg-1); margin: 0; }
+  .no-ai-body strong { color: var(--fg-0); font-weight: 600; }
+
+  footer { padding: 40px 32px 50px; border-top: 1px solid var(--line-soft); color: var(--fg-2); font-size: 12px; max-width: 1200px; margin: 60px auto 0; }
+  footer a { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark" role="img" aria-label="Allin Signal logo"></div>
+    <div class="brand-name">Allin Signal <span>· allinsignal.com</span></div>
+  </div>
+  <nav class="nav">
+    <a href="index.html">Signals</a>
+    <a href="Methodology.html" class="active">Methodology</a>
+    <a href="Watchlist.html">Watchlist</a>
+    <a href="Pricing.html">Pricing</a>
+  </nav>
+  <div class="topbar-right">
+    <button class="btn-ghost">Sign in</button>
+    <button class="btn-primary">Subscribe · $3/mo</button>
+  </div>
+</header>
+
+<main class="page">
+  <div class="eyebrow">Methodology</div>
+  <h1>Built for buy-and-hold investors. Not for day traders.</h1>
+  <p class="lede">Allin Signal is a long-horizon trend system. We rate stocks once per close based on whether the long-term trend is intact — not where price will be in the next hour, day, or week.</p>
+
+  <div class="callout">
+    <div class="icon">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+    </div>
+    <div>
+      <b>Not suitable for day trading.</b>
+      <span>Our signals refresh on the weekly close and are designed to be held for months to years. They will not catch intraday reversals, earnings pops, or short-term swings — and they're not meant to. If your holding period is measured in minutes or hours, this product is the wrong tool.</span>
+    </div>
+  </div>
+
+  <h2>Who Allin Signal is for</h2>
+  <div class="who-grid">
+    <div class="who-card yes">
+      <span class="who-tag yes">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M4 12l5 5L20 6"/></svg>
+        Good fit
+      </span>
+      <ul>
+        <li><svg class="check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg>Long-term investors holding positions for months or years</li>
+        <li><svg class="check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg>Investors who want a mechanical filter against riding broken stocks</li>
+        <li><svg class="check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg>People building or rebalancing a multi-name portfolio</li>
+        <li><svg class="check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg>DIY investors who check positions weekly, not constantly</li>
+      </ul>
+    </div>
+    <div class="who-card no">
+      <span class="who-tag no">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        Not a fit
+      </span>
+      <ul>
+        <li><svg class="x" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6L6 18"/></svg>Day traders looking for entry/exit timing within a session</li>
+        <li><svg class="x" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6L6 18"/></svg>Swing traders working on hour or day timeframes</li>
+        <li><svg class="x" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6L6 18"/></svg>Options traders who need short-dated direction calls</li>
+        <li><svg class="x" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6L6 18"/></svg>Anyone wanting earnings-day or news-driven trades</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="no-ai">
+    <div class="no-ai-icon">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4"/><path d="M12 18v4"/><path d="M4.93 4.93l2.83 2.83"/><path d="M16.24 16.24l2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="M4.93 19.07l2.83-2.83"/><path d="M16.24 7.76l2.83-2.83"/><circle cx="12" cy="12" r="3"/></svg>
+    </div>
+    <div>
+      <div class="no-ai-eyebrow">Human-built · No AI</div>
+      <h3 class="no-ai-title">Zero artificial intelligence goes into our signals.</h3>
+      <p class="no-ai-body">Our stock ratings come from <strong>years of hands-on experience, trial and error, and disciplined refinement at the chart</strong> — not from a black-box model that nobody can audit. Every rule was earned the hard way: by sitting through cycles, watching what works, and discarding what doesn't. The strategy you see today is the result, and it has proven to be <strong>the most reliable and profitable approach</strong> we've found for long-horizon trend investing.</p>
+    </div>
+  </div>
+
+  <h2>How it works (without the secret sauce)</h2>
+  <p>Every Friday at the close, Allin Signal scans every stock listed on NYSE, NASDAQ, and AMEX through our proprietary trend model. The model produces a single output per ticker: <strong>BUY</strong> if the long-term trend is intact and confirmed, <strong>SELL</strong> if it has broken.</p>
+  <p>We do not publish the inputs, the weights, or the math. What we publish is the rating and a confidence score. The methodology is built for one job — to keep buy-and-hold investors in healthy uptrends and out of structurally broken names.</p>
+
+  <h2>Principles we hold</h2>
+  <div class="principles">
+    <div class="principle"><b>One timeframe.</b><span>Ratings are computed from weekly closes only. We don't watch intraday charts and neither should you, if you're using this product as designed.</span></div>
+    <div class="principle"><b>One rating per stock.</b><span>BUY or SELL. No "hold," no "accumulate," no five-tier nuance. Ambiguity is a leak; we don't ship it.</span></div>
+    <div class="principle"><b>Trend over story.</b><span>We don't read earnings transcripts or price targets. The chart is the audit trail of every opinion already in the market.</span></div>
+    <div class="principle"><b>Patience over activity.</b><span>Most weeks, most ratings will not change. That is the feature, not a bug. Buy-and-hold means you do less, on purpose.</span></div>
+  </div>
+
+  <h2>What this is not</h2>
+  <p>Allin Signal is not investment advice, not a managed account, and not a guarantee. It is a mechanical reading of the market for investors who want to outsource trend judgment to a rule and free up their attention for life. Past performance is not a promise of future results, and your personal situation, taxes, and risk tolerance are yours to manage.</p>
+
+  <p style="margin-top: 28px;">Questions? Email <a href="mailto:allinsignalsupport@gmail.com" style="color:var(--accent)">allinsignalsupport@gmail.com</a>.</p>
+</main>
+
+<footer>
+  <div style="color: var(--fg-1); margin-bottom: 6px;">Allin Signal · allinsignal.com</div>
+  <div>Support: <a href="mailto:allinsignalsupport@gmail.com">allinsignalsupport@gmail.com</a></div>
+  <div style="margin-top: 4px;">© 2026 · Data delayed 15 minutes for non-members</div>
+</footer>
+
+<script>
+  // Inherit theme from the home page if it was set
+  try {
+    const stored = localStorage.getItem('allin-theme');
+    if (stored === 'light' || stored === 'dark') {
+      document.documentElement.setAttribute('data-theme', stored);
+    }
+  } catch (e) {}
+</script>
+
+<script type="module" src="js/supabase-client.js"></script>
+<script src="js/auth.js"></script>
+</body>
+</html>

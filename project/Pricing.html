@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Pricing — Allin Signal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root, [data-theme="dark"] {
+    --bg-0: oklch(0.16 0.008 250);
+    --bg-1: oklch(0.20 0.010 250);
+    --bg-2: oklch(0.235 0.011 250);
+    --bg-3: oklch(0.27 0.012 250);
+    --line: oklch(0.32 0.012 250);
+    --line-soft: oklch(0.26 0.010 250);
+    --fg-0: oklch(0.97 0.005 250);
+    --fg-1: oklch(0.78 0.010 250);
+    --fg-2: oklch(0.58 0.012 250);
+    --fg-3: oklch(0.42 0.012 250);
+    --buy: oklch(0.80 0.17 150);
+    --buy-soft: oklch(0.80 0.17 150 / 0.12);
+    --sell: oklch(0.68 0.21 25);
+    --sell-soft: oklch(0.68 0.21 25 / 0.12);
+    --accent: oklch(0.78 0.14 220);
+    --accent-soft: oklch(0.78 0.14 220 / 0.14);
+    --logo-fg: var(--bg-0);
+    --topbar-bg: oklch(0.16 0.008 250 / 0.85);
+  }
+  [data-theme="light"] {
+    --bg-0: oklch(0.985 0.003 250); --bg-1: oklch(1 0 0); --bg-2: oklch(0.965 0.005 250); --bg-3: oklch(0.93 0.008 250);
+    --line: oklch(0.86 0.008 250); --line-soft: oklch(0.92 0.006 250);
+    --fg-0: oklch(0.20 0.010 250); --fg-1: oklch(0.36 0.012 250); --fg-2: oklch(0.52 0.014 250); --fg-3: oklch(0.68 0.012 250);
+    --buy: oklch(0.58 0.17 150); --buy-soft: oklch(0.58 0.17 150 / 0.10);
+    --sell: oklch(0.58 0.22 25); --sell-soft: oklch(0.58 0.22 25 / 0.10);
+    --accent: oklch(0.55 0.18 240); --accent-soft: oklch(0.55 0.18 240 / 0.10);
+    --logo-fg: oklch(0.99 0 0); --topbar-bg: oklch(0.985 0.003 250 / 0.85);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg-0); color: var(--fg-0); font-family: 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; font-feature-settings: 'tnum'; font-variant-numeric: tabular-nums; }
+  a { color: inherit; text-decoration: none; }
+  button { font-family: inherit; cursor: pointer; border: 0; background: transparent; color: inherit; }
+
+  .topbar { position: sticky; top: 0; z-index: 50; height: 56px; display: flex; align-items: center; padding: 0 20px; gap: 24px; background: var(--topbar-bg); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line-soft); }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; }
+  .brand-mark { width: 32px; height: 32px; background: url('assets/allin-logo.png') center/contain no-repeat; font-weight: 800; font-size: 13px; }
+  .brand-name { font-size: 15px; }
+  .brand-name span { color: var(--fg-2); font-weight: 500; }
+  .nav { display: flex; gap: 4px; margin-left: 8px; }
+  .nav a { padding: 8px 12px; border-radius: 6px; font-size: 13px; color: var(--fg-1); }
+  .nav a.active { color: var(--fg-0); background: var(--bg-2); }
+  .nav a:hover:not(.active) { color: var(--fg-0); }
+  .topbar-right { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+  .btn-ghost { padding: 7px 12px; border-radius: 6px; font-size: 13px; color: var(--fg-1); border: 1px solid var(--line-soft); }
+  .btn-primary { padding: 7px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; color: var(--logo-fg); background: var(--buy); }
+
+  /* Hero */
+  .hero { text-align: center; padding: 80px 28px 40px; max-width: 760px; margin: 0 auto; }
+  .eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--accent); font-weight: 600; margin-bottom: 14px; }
+  h1 { font-size: 52px; line-height: 1.04; letter-spacing: -0.025em; margin: 0 0 16px; font-weight: 700; text-wrap: balance; }
+  h1 em { font-style: normal; color: var(--buy); }
+  .lede { font-size: 18px; line-height: 1.55; color: var(--fg-1); margin: 0 auto; max-width: 560px; }
+
+  /* Plans */
+  .plans { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; max-width: 880px; margin: 30px auto 60px; padding: 0 28px; }
+  .plan { background: var(--bg-1); border: 1px solid var(--line-soft); border-radius: 16px; padding: 28px; position: relative; }
+  .plan.featured { border-color: var(--buy); box-shadow: 0 0 0 1px var(--buy-soft), 0 30px 60px -30px oklch(0 0 0 / 0.5); }
+  .plan-tag { position: absolute; top: -10px; right: 24px; font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 5px 10px; border-radius: 5px; background: var(--buy); color: var(--logo-fg); }
+  .plan-name { font-size: 13px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--fg-2); font-weight: 600; margin-bottom: 14px; }
+  .price-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+  .price-row .num { font-size: 56px; font-weight: 700; letter-spacing: -0.02em; }
+  .price-row .per { font-size: 14px; color: var(--fg-2); }
+  .price-note { font-size: 12px; color: var(--fg-2); margin-bottom: 22px; }
+  .plan ul { list-style: none; padding: 0; margin: 0 0 22px; display: grid; gap: 10px; }
+  .plan li { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; color: var(--fg-1); line-height: 1.5; }
+  .plan .check { color: var(--buy); flex: none; margin-top: 2px; }
+  .plan .x { color: var(--fg-3); flex: none; margin-top: 2px; }
+  .plan li.muted { color: var(--fg-3); }
+  .cta { width: 100%; padding: 12px; border-radius: 8px; font-size: 14px; font-weight: 600; }
+  .cta.primary { background: var(--buy); color: var(--logo-fg); }
+  .cta.primary:hover { filter: brightness(1.06); }
+  .cta.ghost { background: var(--bg-2); color: var(--fg-0); border: 1px solid var(--line-soft); }
+  .cta.ghost:hover { background: var(--bg-3); }
+
+  /* Compare */
+  .compare-section { max-width: 880px; margin: 0 auto 60px; padding: 0 28px; }
+  .section-h2 { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 18px; text-align: center; }
+  .compare { background: var(--bg-1); border: 1px solid var(--line-soft); border-radius: 12px; overflow: hidden; }
+  .cmp-row { display: grid; grid-template-columns: 1.6fr 1fr 1fr; padding: 14px 22px; border-bottom: 1px solid var(--line-soft); align-items: center; font-size: 13.5px; }
+  .cmp-row:last-child { border-bottom: 0; }
+  .cmp-head { background: var(--bg-2); color: var(--fg-2); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
+  .cmp-row .feature { color: var(--fg-1); }
+  .cmp-row .col { text-align: center; }
+  .cmp-row .col.member { color: var(--buy); font-weight: 600; }
+  .cmp-row .col.free { color: var(--fg-2); }
+  .cmp-row .check { color: var(--buy); }
+  .cmp-row .x { color: var(--fg-3); }
+
+  /* FAQ */
+  .faq-section { max-width: 760px; margin: 0 auto 80px; padding: 0 28px; }
+  .faq { background: var(--bg-1); border: 1px solid var(--line-soft); border-radius: 12px; overflow: hidden; }
+  .faq details { border-bottom: 1px solid var(--line-soft); }
+  .faq details:last-child { border-bottom: 0; }
+  .faq summary { padding: 18px 22px; font-size: 14px; font-weight: 600; color: var(--fg-0); cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+  .faq summary::-webkit-details-marker { display: none; }
+  .faq summary::after { content: '+'; font-size: 20px; color: var(--fg-2); font-weight: 400; transition: transform 0.2s; }
+  .faq details[open] summary::after { content: '−'; }
+  .faq details[open] summary { color: var(--accent); }
+  .faq .answer { padding: 0 22px 18px; font-size: 13.5px; color: var(--fg-1); line-height: 1.6; }
+
+  footer { padding: 40px 32px 50px; border-top: 1px solid var(--line-soft); color: var(--fg-2); font-size: 12px; }
+  footer a { color: var(--accent); }
+
+  @media (max-width: 760px) {
+    .plans { grid-template-columns: 1fr; }
+    .cmp-row { grid-template-columns: 1.4fr 1fr 1fr; padding: 12px 16px; font-size: 12.5px; }
+    h1 { font-size: 36px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark" role="img" aria-label="Allin Signal logo"></div>
+    <div class="brand-name">Allin Signal <span>· allinsignal.com</span></div>
+  </div>
+  <nav class="nav">
+    <a href="index.html">Signals</a>
+    <a href="Methodology.html">Methodology</a>
+    <a href="Watchlist.html">Watchlist</a>
+    <a href="Pricing.html" class="active">Pricing</a>
+  </nav>
+  <div class="topbar-right">
+    <button class="btn-ghost">Sign in</button>
+    <button class="btn-primary" id="topSub">Subscribe · $3/mo</button>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="eyebrow">Pricing</div>
+  <h1>One scanner. <em>$3</em> a month. That's it.</h1>
+  <p class="lede">No tiers, no annual lock-in, no upsells to a "pro" plan that has the actual product behind it. Either you want our trend ratings, or you don't.</p>
+</section>
+
+<div class="plans">
+  <div class="plan">
+    <div class="plan-name">Free</div>
+    <div class="price-row"><span class="num mono">$0</span><span class="per">/ forever</span></div>
+    <div class="price-note">No account required</div>
+    <ul>
+      <li><svg class="check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg>Top 10 buy ratings on the home page</li>
+      <li><svg class="check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg>Read-only methodology page</li>
+      <li class="muted"><svg class="x" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6L6 18"/></svg>No ticker search</li>
+      <li class="muted"><svg class="x" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6L6 18"/></svg>No watchlist or alerts</li>
+      <li class="muted"><svg class="x" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6L6 18"/></svg>15-min delayed data</li>
+    </ul>
+    <button class="cta ghost" onclick="window.location.href='index.html'">Continue free</button>
+  </div>
+
+  <div class="plan featured">
+    <span class="plan-tag">Members</span>
+    <div class="plan-name">Allin Signal</div>
+    <div class="price-row"><span class="num mono">$3</span><span class="per">/ month</span></div>
+    <div class="price-note">Billed monthly · cancel anytime · less than a coffee</div>
+    <ul>
+      <li><svg class="check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg>All <b>2,184</b> active buy ratings + the full sell list</li>
+      <li><svg class="check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg>Search any ticker on NYSE / NASDAQ / AMEX</li>
+      <li><svg class="check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg>Watchlist of up to 50 tickers with rating-flip alerts</li>
+      <li><svg class="check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg>Weekly email digest of new crossovers</li>
+      <li><svg class="check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg>CSV export &amp; real-time scan refresh</li>
+    </ul>
+    <button class="cta primary" id="planSub">Subscribe — $3 / month</button>
+  </div>
+</div>
+
+<div class="compare-section">
+  <h2 class="section-h2">What's actually different</h2>
+  <div class="compare">
+    <div class="cmp-row cmp-head">
+      <div>Feature</div>
+      <div class="col">Free</div>
+      <div class="col">Members</div>
+    </div>
+    <div class="cmp-row"><div class="feature">Top 10 buy ratings</div><div class="col free"><svg class="check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg></div><div class="col member"><svg class="check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg></div></div>
+    <div class="cmp-row"><div class="feature">Full buy + sell scanner</div><div class="col free"><svg class="x" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6L6 18"/></svg></div><div class="col member"><svg class="check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg></div></div>
+    <div class="cmp-row"><div class="feature">Search any ticker</div><div class="col free"><svg class="x" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6L6 18"/></svg></div><div class="col member"><svg class="check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg></div></div>
+    <div class="cmp-row"><div class="feature">Watchlist (up to 50 tickers)</div><div class="col free"><svg class="x" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6L6 18"/></svg></div><div class="col member"><svg class="check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg></div></div>
+    <div class="cmp-row"><div class="feature">Rating-flip email alerts</div><div class="col free"><svg class="x" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6L6 18"/></svg></div><div class="col member"><svg class="check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg></div></div>
+    <div class="cmp-row"><div class="feature">CSV export</div><div class="col free"><svg class="x" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6L6 18"/></svg></div><div class="col member"><svg class="check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg></div></div>
+    <div class="cmp-row"><div class="feature">Data refresh</div><div class="col free mono">15-min delay</div><div class="col member mono">Real-time</div></div>
+  </div>
+</div>
+
+<div class="faq-section">
+  <h2 class="section-h2">Frequently asked</h2>
+  <div class="faq">
+    <details open>
+      <summary>Why only $3 a month?</summary>
+      <div class="answer">Because the product is a single scanner with a single output per ticker. There's no premium tier where the "real" data lives — what you see on this page is everything we sell. We'd rather price low and have you stay than price high and churn you out.</div>
+    </details>
+    <details>
+      <summary>Can I cancel anytime?</summary>
+      <div class="answer">Yes. One click in your account settings. No retention call, no email gauntlet. Your access continues through the end of the billing cycle you've already paid for.</div>
+    </details>
+    <details>
+      <summary>Is this for day trading?</summary>
+      <div class="answer">No. Allin Signal is a buy-and-hold trend system. Ratings refresh on the weekly close and are designed to be held for months to years. If you trade intraday, this is the wrong tool. See the <a href="Methodology.html" style="color:var(--accent)">methodology</a> page for the full positioning.</div>
+    </details>
+    <details>
+      <summary>Is this investment advice?</summary>
+      <div class="answer">No. Ratings are mechanical readings from our trend model. Your taxes, risk tolerance, time horizon, and overall financial situation are yours to manage — ideally with a qualified advisor.</div>
+    </details>
+    <details>
+      <summary>Do you offer refunds?</summary>
+      <div class="answer">If you subscribed by mistake within the last 7 days and haven't used the member features meaningfully, email <a href="mailto:allinsignalsupport@gmail.com" style="color:var(--accent)">allinsignalsupport@gmail.com</a> and we'll refund you. After that, just cancel — no further charges.</div>
+    </details>
+    <details>
+      <summary>What payment methods do you accept?</summary>
+      <div class="answer">Card, Apple Pay, and PayPal. Payments are processed by our PCI-compliant partner; we don't store card data on our servers.</div>
+    </details>
+  </div>
+</div>
+
+<footer>
+  <div style="color: var(--fg-1); margin-bottom: 6px;">Allin Signal · allinsignal.com</div>
+  <div>Support: <a href="mailto:allinsignalsupport@gmail.com">allinsignalsupport@gmail.com</a></div>
+  <div style="margin-top: 4px;">© 2026 · Data delayed 15 minutes for non-members</div>
+</footer>
+
+<script>
+  function goSubscribe() { window.location.href = 'index.html'; }
+  document.getElementById('topSub').addEventListener('click', goSubscribe);
+  document.getElementById('planSub').addEventListener('click', goSubscribe);
+</script>
+
+<script type="module" src="js/supabase-client.js"></script>
+<script src="js/auth.js"></script>
+</body>
+</html>
