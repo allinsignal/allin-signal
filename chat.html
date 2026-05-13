@@ -433,7 +433,8 @@
   let isBanned       = false;
   let realtimeChannel = null;
   let lastDateLabel  = null;
-  const reactionsMap = {}; // { [msgId]: { [emoji]: { count, mine } } }
+  const reactionsMap  = {}; // { [msgId]: { [emoji]: { count, mine } } }
+  const reactionIdMap = {}; // { [reactionId]: { message_id, emoji, user_id } }
   let pickerMsgId    = null;
 
   // ---- Reaction helpers ----
@@ -442,12 +443,18 @@
     if (!reactionsMap[r.message_id][r.emoji]) reactionsMap[r.message_id][r.emoji] = { count: 0, mine: false };
     reactionsMap[r.message_id][r.emoji].count++;
     if (r.user_id === currentUser?.id) reactionsMap[r.message_id][r.emoji].mine = true;
+    if (r.id) reactionIdMap[r.id] = { message_id: r.message_id, emoji: r.emoji, user_id: r.user_id };
   }
   function removeFromMap(r) {
-    if (!reactionsMap[r.message_id]?.[r.emoji]) return;
-    reactionsMap[r.message_id][r.emoji].count = Math.max(0, reactionsMap[r.message_id][r.emoji].count - 1);
-    if (r.user_id === currentUser?.id) reactionsMap[r.message_id][r.emoji].mine = false;
-    if (reactionsMap[r.message_id][r.emoji].count === 0) delete reactionsMap[r.message_id][r.emoji];
+    // DELETE payloads only carry the primary key — resolve via reactionIdMap if needed
+    const resolved = (r.message_id && r.emoji) ? r : reactionIdMap[r.id];
+    if (!resolved) return;
+    if (!reactionsMap[resolved.message_id]?.[resolved.emoji]) return;
+    reactionsMap[resolved.message_id][resolved.emoji].count = Math.max(0, reactionsMap[resolved.message_id][resolved.emoji].count - 1);
+    if (resolved.user_id === currentUser?.id) reactionsMap[resolved.message_id][resolved.emoji].mine = false;
+    if (reactionsMap[resolved.message_id][resolved.emoji].count === 0) delete reactionsMap[resolved.message_id][resolved.emoji];
+    if (r.id) delete reactionIdMap[r.id];
+    return resolved.message_id;
   }
   function renderReactions(msgId) {
     const el = document.getElementById('rxn-' + msgId);
@@ -464,6 +471,16 @@
   async function toggleReaction(msgId, emoji) {
     if (!currentUser) return;
     const mine = reactionsMap[msgId]?.[emoji]?.mine;
+
+    // Optimistic update — render immediately, don't wait for realtime
+    if (mine) {
+      removeFromMap({ message_id: msgId, user_id: currentUser.id, emoji });
+    } else {
+      addToMap({ message_id: msgId, user_id: currentUser.id, emoji });
+    }
+    renderReactions(msgId);
+
+    // Sync to DB
     if (mine) {
       await window.allin.supabase.from('message_reactions')
         .delete().eq('message_id', msgId).eq('user_id', currentUser.id).eq('emoji', emoji);
@@ -680,8 +697,8 @@
         renderReactions(payload.new.message_id);
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'message_reactions' }, payload => {
-        removeFromMap(payload.old);
-        renderReactions(payload.old.message_id);
+        const msgId = removeFromMap(payload.old);
+        if (msgId) renderReactions(msgId);
       })
       .subscribe();
   }
