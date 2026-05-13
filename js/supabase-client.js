@@ -64,7 +64,7 @@ async function freeSignals() {
     supabase.from('signals').select('*').eq('rating', 'BUY')
       .order('confidence', { ascending: false }).limit(2),
     supabase.from('signals').select('*').eq('rating', 'BUY')
-      .order('confidence', { ascending: false }).range(10, 14),
+      .order('confidence', { ascending: false }).range(10, 17),
   ]);
   const top2 = (top2res.data || []).map(r => ({ ...r, isBest: true }));
   const mid5 = (mid5res.data || []).map(r => ({ ...r, isBest: false }));
