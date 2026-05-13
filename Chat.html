@@ -453,7 +453,7 @@
       .from('chat_bans').select('user_id').eq('user_id', currentUser.id).maybeSingle();
     isBanned = !!ban;
 
-    const layout = document.getElementById('chatLayout');
+    const layout = document.getElementById('chatMain');
     document.getElementById('chatGate').remove();
 
     // Add banned notice or input bar
