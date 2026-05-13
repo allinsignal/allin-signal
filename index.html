@@ -725,8 +725,7 @@
 
     <div class="drawer-chart">
       <div class="dc-legend">
-        <span><span class="swatch" style="background:var(--fg-1)"></span>Daily close</span>
-        <span><span class="swatch" style="background:var(--accent)"></span>Trend baseline</span>
+        <span><span class="swatch" style="background:var(--fg-1)"></span>52-week price</span>
       </div>
       <svg id="dChart" viewBox="0 0 540 200" width="100%" height="200" preserveAspectRatio="none"></svg>
     </div>
@@ -948,6 +947,35 @@
   const drawer = document.getElementById('drawer');
   let currentSignal = null;
 
+  function renderDrawerChart(prices, signal) {
+    const w = 540, h = 200, pad = 16;
+    const min = Math.min(...prices), max = Math.max(...prices);
+    const range = max - min || 1;
+    const n = prices.length;
+    const pts = prices.map((p, i) => [
+      n > 1 ? (i / (n - 1)) * w : w / 2,
+      pad + ((max - p) / range) * (h - pad * 2),
+    ]);
+    const linePath = 'M' + pts.map(([x, y]) => x.toFixed(1) + ' ' + y.toFixed(1)).join(' L');
+    const areaPath = linePath + ' L' + pts[n-1][0].toFixed(1) + ' ' + h + ' L0 ' + h + ' Z';
+    const col  = signal === 'SELL' ? 'oklch(0.68 0.21 25)' : 'oklch(0.80 0.17 150)';
+    const [lx, ly] = pts[n - 1];
+    return `<defs>
+        <linearGradient id="dg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${col}" stop-opacity="0.22"/>
+          <stop offset="100%" stop-color="${col}" stop-opacity="0"/>
+        </linearGradient>
+        <pattern id="dgrid" width="60" height="40" patternUnits="userSpaceOnUse">
+          <path d="M60 0H0V40" fill="none" stroke="oklch(0.26 0.01 250)" stroke-width="0.5"/>
+        </pattern>
+      </defs>
+      <rect width="${w}" height="${h}" fill="url(#dgrid)"/>
+      <path d="${areaPath}" fill="url(#dg)"/>
+      <path d="${linePath}" stroke="${col}" stroke-width="2" fill="none" stroke-linejoin="round"/>
+      <circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="4" fill="${col}"/>
+      <circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="9" fill="${col}" opacity="0.15"/>`;
+  }
+
   function openDrawer(s, i) {
     currentSignal = s;
     const logo = document.getElementById('dLogo');
@@ -959,14 +987,20 @@
     document.getElementById('dPrice').textContent = '$' + s.price.toFixed(2);
 
     const chgEl = document.getElementById('dChg');
-    chgEl.textContent = `${s.chg >= 0 ? '▲' : '▼'} ${Math.abs(s.chg).toFixed(2)}% · this week`;
-    chgEl.classList.toggle('down', s.chg < 0);
+    const ytd = summaries[s.t]?.ytd_change;
+    if (ytd != null) {
+      chgEl.textContent = `${ytd >= 0 ? '▲' : '▼'} ${Math.abs(ytd).toFixed(1)}% · year to date`;
+      chgEl.classList.toggle('down', ytd < 0);
+    } else {
+      chgEl.textContent = `${s.chg >= 0 ? '▲' : '▼'} ${Math.abs(s.chg).toFixed(2)}% · this week`;
+      chgEl.classList.toggle('down', s.chg < 0);
+    }
 
     document.getElementById('dEma').textContent = '$' + s.ema.toFixed(2);
     const dist = (s.price - s.ema) / s.ema * 100;
     document.getElementById('dDist').textContent = (dist >= 0 ? '+' : '') + dist.toFixed(2) + '%';
     document.getElementById('dRange').textContent = `$${(s.price * 0.62).toFixed(2)} — $${(s.price * 1.18).toFixed(2)}`;
-    document.getElementById('dConf').textContent = (78 + (i % 9)) + '%';
+    document.getElementById('dConf').textContent = s.conf > 0 ? Math.round(s.conf * 100) + '%' : (78 + (i % 9)) + '%';
 
     const v = document.getElementById('dVerdict');
     v.classList.remove('sell');
@@ -983,24 +1017,29 @@
     ].map(([label, mark, val]) => `<li>${mark}<span>${label}</span><b class="mono">${val}</b></li>`).join('');
 
     const chart = document.getElementById('dChart');
-    const sp = sparkPath(i + 11, 540, 200, 16, 16);
-    const area = `${sp.pPrice} L540 200 L0 200 Z`;
-    chart.innerHTML = `
-      <defs>
-        <linearGradient id="dg" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="oklch(0.80 0.17 150)" stop-opacity="0.25"/>
-          <stop offset="100%" stop-color="oklch(0.80 0.17 150)" stop-opacity="0"/>
-        </linearGradient>
-        <pattern id="dgrid" width="60" height="40" patternUnits="userSpaceOnUse">
-          <path d="M60 0H0V40" fill="none" stroke="oklch(0.26 0.01 250)" stroke-width="0.5"/>
-        </pattern>
-      </defs>
-      <rect width="540" height="200" fill="url(#dgrid)"/>
-      <path d="${area}" fill="url(#dg)"/>
-      <path d="${sp.pEma}" stroke="oklch(0.78 0.14 220)" stroke-width="1.6" fill="none" stroke-dasharray="5 4"/>
-      <path d="${sp.pPrice}" stroke="oklch(0.80 0.17 150)" stroke-width="2" fill="none"/>
-      <circle cx="${sp.lastX - 2}" cy="${sp.lastY}" r="4" fill="oklch(0.80 0.17 150)"/>
-      <circle cx="${sp.lastX - 2}" cy="${sp.lastY}" r="9" fill="oklch(0.80 0.17 150)" opacity="0.15"/>`;
+    const sparkPrices = summaries[s.t]?.spark;
+    if (sparkPrices?.length) {
+      chart.innerHTML = renderDrawerChart(sparkPrices, s.rating || 'BUY');
+    } else {
+      const sp = sparkPath(i + 11, 540, 200, 16, 16);
+      const area = `${sp.pPrice} L540 200 L0 200 Z`;
+      chart.innerHTML = `
+        <defs>
+          <linearGradient id="dg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="oklch(0.80 0.17 150)" stop-opacity="0.25"/>
+            <stop offset="100%" stop-color="oklch(0.80 0.17 150)" stop-opacity="0"/>
+          </linearGradient>
+          <pattern id="dgrid" width="60" height="40" patternUnits="userSpaceOnUse">
+            <path d="M60 0H0V40" fill="none" stroke="oklch(0.26 0.01 250)" stroke-width="0.5"/>
+          </pattern>
+        </defs>
+        <rect width="540" height="200" fill="url(#dgrid)"/>
+        <path d="${area}" fill="url(#dg)"/>
+        <path d="${sp.pEma}" stroke="oklch(0.78 0.14 220)" stroke-width="1.6" fill="none" stroke-dasharray="5 4"/>
+        <path d="${sp.pPrice}" stroke="oklch(0.80 0.17 150)" stroke-width="2" fill="none"/>
+        <circle cx="${sp.lastX - 2}" cy="${sp.lastY}" r="4" fill="oklch(0.80 0.17 150)"/>
+        <circle cx="${sp.lastX - 2}" cy="${sp.lastY}" r="9" fill="oklch(0.80 0.17 150)" opacity="0.15"/>`;
+    }
 
     drawer.classList.add('open');
     scrim.classList.add('open');
@@ -1317,6 +1356,7 @@
         price: Number(r.price),
         ema: Number(r.trend_base ?? r.price),
         chg: Number(r.weekly_change ?? 0),
+        conf: Number(r.confidence ?? 0),
         mcap: r.market_cap_band || 'Mega',
         rating: r.rating || 'BUY',
       }));
