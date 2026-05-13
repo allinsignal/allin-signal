@@ -22,17 +22,17 @@ const LOOKBACK_DAYS = 4 * 252;              // 4-year confidence window (~1008 d
 const HISTORY_DAYS = SMA_DAYS + LOOKBACK_DAYS + 50; // ~2058 days needed
 const MARKET_CAP_MIN = 10_000_000_000;      // $10B — large cap floor (no upper limit)
 const MAX_DISTANCE_ABOVE_SMA = 0.10;        // 0–10% above SMA = BUY zone
+const MOMENTUM_WINDOW = 40;                 // ~8 trading weeks for direction detection
 
 // ====== ALLIN MODEL ===================================================
 // Buy zone: price is 0–10% above its 200-week SMA.
-// Confidence = fraction of the last 4 years the stock spent ABOVE its
-// 200-week SMA (sliding window). Stocks that rarely dip below their
-// long-term trend score highest.
+// Confidence = 70% track record (4-yr history above SMA) + 30% entry quality.
+// Entry quality rewards stocks DECLINING toward the SMA (on sale) over
+// stocks that just crossed up from below (not yet a bargain).
 function rate(closes: number[], marketCap: number) {
-  if (marketCap < MARKET_CAP_MIN) return null;  // exclude small/mid cap
+  if (marketCap < MARKET_CAP_MIN) return null;
   if (closes.length < SMA_DAYS + 1) return null;
 
-  // Current 200-week SMA and price
   const recentSmaWindow = closes.slice(-SMA_DAYS);
   const sma = recentSmaWindow.reduce((a, b) => a + b, 0) / SMA_DAYS;
   const price = closes[closes.length - 1];
@@ -40,8 +40,7 @@ function rate(closes: number[], marketCap: number) {
 
   const rating = distance >= 0 && distance <= MAX_DISTANCE_ABOVE_SMA ? "BUY" : "SELL";
 
-  // Confidence: % of days in 4-year lookback where price > rolling 200-week SMA.
-  // Uses a sliding window sum for O(n) performance.
+  // 4-year track record: % of days price was above its rolling 200-week SMA.
   const lookback = Math.min(LOOKBACK_DAYS, closes.length - SMA_DAYS);
   const startIdx = closes.length - SMA_DAYS - lookback;
 
@@ -52,7 +51,6 @@ function rate(closes: number[], marketCap: number) {
   for (let i = 0; i < lookback; i++) {
     const priceIdx = startIdx + SMA_DAYS + i;
     if (closes[priceIdx] > windowSum / SMA_DAYS) daysAbove++;
-    // Slide: drop oldest bar, add the bar that just entered the SMA window
     if (i < lookback - 1) {
       windowSum -= closes[startIdx + i];
       windowSum += closes[priceIdx];
@@ -61,13 +59,26 @@ function rate(closes: number[], marketCap: number) {
 
   const trackRecord = daysAbove / lookback;
 
-  // For BUY signals: blend track record with proximity to SMA.
-  // Being just above the SMA (distance → 0) is the ideal entry, so it boosts confidence.
-  // For SELL signals: pure track record (no entry-point component).
   let confidence: number;
   if (rating === "BUY") {
-    const proximityScore = 1 - (distance / MAX_DISTANCE_ABOVE_SMA); // 1.0 at SMA, 0.0 at 10% above
-    confidence = 0.6 * trackRecord + 0.4 * proximityScore;
+    // Proximity: 1.0 when touching SMA, 0.0 when 10% above
+    const proximityScore = 1 - (distance / MAX_DISTANCE_ABOVE_SMA);
+
+    // Direction: is price declining toward SMA (ideal "on sale" entry)?
+    // Negative 8-week momentum = approaching from above = full score.
+    // Rising momentum = just crossed from below = penalized.
+    const mWindow = Math.min(MOMENTUM_WINDOW, closes.length - 1);
+    const momentum = (closes[closes.length - 1] - closes[closes.length - 1 - mWindow])
+                     / closes[closes.length - 1 - mWindow];
+    const directionScore = momentum < 0
+      ? 1.0
+      : Math.max(0, 1 - momentum / MAX_DISTANCE_ABOVE_SMA);
+
+    // Entry quality blends proximity with direction equally
+    const entryScore = 0.5 * proximityScore + 0.5 * directionScore;
+
+    // Track record dominates (70%); entry quality is the tiebreaker (30%)
+    confidence = 0.7 * trackRecord + 0.3 * entryScore;
   } else {
     confidence = trackRecord;
   }
@@ -117,12 +128,11 @@ async function runScan() {
       await supabase.from("price_history").upsert(bars.slice(i, i + 1000));
     }
 
-    // 2. Load eligible universe (market cap $10B–$200B)
+    // 2. Load eligible universe (large/mega cap: $10B+, no upper limit)
     const { data: universe } = await supabase
       .from("tickers")
       .select("ticker, name, market_cap")
       .gte("market_cap", MARKET_CAP_MIN)
-      .lte("market_cap", MARKET_CAP_MAX)
       .eq("active", true);
 
     const capMap = new Map(universe?.map(u => [u.ticker, u]) || []);
