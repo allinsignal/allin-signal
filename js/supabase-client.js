@@ -57,6 +57,20 @@ async function topSignals(limit = 10) {
   return data || [];
 }
 
+// Free preview: top 2 BEST picks + ranks #11–#15 (skips the subscriber-only #3–#10).
+async function freeSignals() {
+  if (!supabase) return [];
+  const [top2res, mid5res] = await Promise.all([
+    supabase.from('signals').select('*').eq('rating', 'BUY')
+      .order('confidence', { ascending: false }).limit(2),
+    supabase.from('signals').select('*').eq('rating', 'BUY')
+      .order('confidence', { ascending: false }).range(10, 14),
+  ]);
+  const top2 = (top2res.data || []).map(r => ({ ...r, isBest: true }));
+  const mid5 = (mid5res.data || []).map(r => ({ ...r, isBest: false }));
+  return [...top2, ...mid5];
+}
+
 async function allSignals(limit = 500) {
   if (!supabase) return [];
   const { data, error } = await supabase
@@ -172,7 +186,7 @@ window.allin = {
   supabase,
   isConfigured,
   signUp, signIn, signOut, currentUser, currentProfile,
-  topSignals, allSignals, searchSignal,
+  topSignals, freeSignals, allSignals, searchSignal,
   getWatchlists, createWatchlist, deleteWatchlist, renameWatchlist,
   getWatchlistItems, addToWatchlist, removeFromWatchlist, toggleAlerts,
   recentChanges,

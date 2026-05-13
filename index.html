@@ -881,7 +881,7 @@
       card.className = 'signal-card';
       card.dataset.idx = i;
       card.innerHTML = `
-        <div class="sc-rank mono">#${String(i + 1).padStart(2, '0')} <span class="badge-top">BEST</span></div>
+        <div class="sc-rank mono">#${String(i + 1).padStart(2, '0')}${s.isBest ? ' <span class="badge-top">BEST</span>' : ''}</div>
         <div class="sc-head">
           <div class="sc-logo" style="background:${hashColor(s.t)};color:var(--logo-fg)">${s.t.slice(0, 2)}</div>
           <div>
@@ -1371,7 +1371,7 @@
       });
 
     try {
-      const rows = await window.allin.topSignals(10);
+      const rows = await window.allin.freeSignals();
       if (!rows || !rows.length) return;
 
       signals.length = 0;
@@ -1384,6 +1384,7 @@
         conf: Number(r.confidence ?? 0),
         mcap: r.market_cap_band || 'Mega',
         rating: r.rating || 'BUY',
+        isBest: !!r.isBest,
       }));
       renderGrid();
 
