@@ -60,7 +60,19 @@ function rate(closes: number[], marketCap: number) {
     }
   }
 
-  const confidence = Math.round((daysAbove / lookback) * 1000) / 1000;
+  const trackRecord = daysAbove / lookback;
+
+  // For BUY signals: blend track record with proximity to SMA.
+  // Being just above the SMA (distance → 0) is the ideal entry, so it boosts confidence.
+  // For SELL signals: pure track record (no entry-point component).
+  let confidence: number;
+  if (rating === "BUY") {
+    const proximityScore = 1 - (distance / MAX_DISTANCE_ABOVE_SMA); // 1.0 at SMA, 0.0 at 10% above
+    confidence = 0.6 * trackRecord + 0.4 * proximityScore;
+  } else {
+    confidence = trackRecord;
+  }
+  confidence = Math.round(confidence * 1000) / 1000;
 
   return { rating, confidence, trend_base: sma };
 }
