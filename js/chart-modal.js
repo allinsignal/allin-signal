@@ -70,16 +70,17 @@
 
   // ---- Fetch price history from Supabase ----
   async function fetchPrices(ticker) {
-    if (!window.allin?.supabase) return [];
+    if (!window.allin?.supabase) return { data: [], error: 'Supabase not ready' };
     const from = new Date();
     from.setFullYear(from.getFullYear() - 6);
-    const { data } = await window.allin.supabase
+    const { data, error } = await window.allin.supabase
       .from('price_history')
       .select('trade_date,open,high,low,close')
       .eq('ticker', ticker)
       .gte('trade_date', from.toISOString().slice(0, 10))
-      .order('trade_date', { ascending: true });
-    return data || [];
+      .order('trade_date', { ascending: true })
+      .limit(2000);
+    return { data: data || [], error };
   }
 
   function setLoading(msg) {
@@ -99,11 +100,20 @@
     setLoading('Loading price history…');
 
     try {
-      const [rows] = await Promise.all([fetchPrices(ticker), loadLWC()]);
+      const [{ data: rows, error: fetchErr }] = await Promise.all([fetchPrices(ticker), loadLWC()]);
+
+      if (fetchErr) {
+        setLoading(
+          `<b>Database error for ${ticker}:</b><br>` +
+          `<span style="font-size:11px;color:var(--fg-3)">${fetchErr?.message || JSON.stringify(fetchErr)}</span>`
+        );
+        return;
+      }
 
       if (!rows.length) {
         setLoading(
           `No price history found for <b>${ticker}</b>.<br>` +
+          `<span style="font-size:11px;color:var(--fg-3)">This ticker may not be in the price database yet.</span><br>` +
           `<a href="https://www.tradingview.com/chart/?symbol=${ticker}" ` +
           `target="_blank" rel="noopener" ` +
           `style="color:var(--accent);margin-top:10px;display:inline-block">` +
