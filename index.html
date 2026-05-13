@@ -1050,21 +1050,21 @@
       topUpgradeBtn.onclick = null;
     }
 
-    // Enable search bar
-    const searchInput = document.getElementById('lockedSearch');
-    const searchWrap = searchInput?.closest('.search-locked');
-    if (searchInput) {
-      searchInput.removeAttribute('readonly');
-      searchInput.style.cursor = 'text';
-    }
-    const lockTag = searchWrap?.querySelector('.lock-tag');
-    if (lockTag) lockTag.style.display = 'none';
+    // Clone the search input to strip the Stripe click handler, then re-wire
+    const oldInput = document.getElementById('lockedSearch');
+    if (oldInput) {
+      const searchWrap = oldInput.closest('.search-locked');
+      const newInput = oldInput.cloneNode(true);
+      oldInput.parentNode.replaceChild(newInput, oldInput);
+      newInput.removeAttribute('readonly');
+      newInput.style.cursor = 'text';
 
-    // Wire search
-    if (searchInput) {
-      searchInput.addEventListener('keydown', async (e) => {
+      const lockTag = searchWrap?.querySelector('.lock-tag');
+      if (lockTag) lockTag.style.display = 'none';
+
+      newInput.addEventListener('keydown', async (e) => {
         if (e.key !== 'Enter') return;
-        const ticker = searchInput.value.trim().toUpperCase();
+        const ticker = newInput.value.trim().toUpperCase();
         if (!ticker) return;
         const sig = await window.allin.searchSignal(ticker);
         if (sig) {
@@ -1075,9 +1075,9 @@
           };
           openDrawer(s, 0);
         } else {
-          searchInput.value = '';
-          searchInput.placeholder = `"${ticker}" not found — try another`;
-          setTimeout(() => { searchInput.placeholder = 'Search any ticker — AAPL, MSFT, NVDA, BRK.B…'; }, 2500);
+          newInput.value = '';
+          newInput.placeholder = `"${ticker}" not found — try another`;
+          setTimeout(() => { newInput.placeholder = 'Search any ticker — AAPL, MSFT, NVDA, BRK.B…'; }, 2500);
         }
       });
     }
