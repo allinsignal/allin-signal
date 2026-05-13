@@ -83,6 +83,39 @@
     backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--line-soft);
   }
+
+  /* ---- Ticker banner ---- */
+  .ticker-banner {
+    position: sticky; top: 56px; z-index: 49;
+    height: 32px; overflow: hidden;
+    background: var(--bg-2); border-bottom: 1px solid var(--line-soft);
+    display: flex; align-items: center;
+  }
+  .ticker-track {
+    display: flex; align-items: center; gap: 0;
+    white-space: nowrap;
+    animation: ticker-scroll 60s linear infinite;
+    will-change: transform;
+  }
+  .ticker-banner:hover .ticker-track { animation-play-state: paused; }
+  @keyframes ticker-scroll {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+  .ticker-item {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 0 20px; font-size: 12px; font-family: 'JetBrains Mono', monospace;
+    border-right: 1px solid var(--line-soft); height: 32px;
+  }
+  .ticker-item .t-sym { font-weight: 600; color: var(--fg-1); }
+  .ticker-item .t-price { color: var(--fg-2); }
+  .ticker-item .t-chg { font-weight: 600; }
+  .ticker-item .t-chg.up   { color: var(--buy); }
+  .ticker-item .t-chg.down { color: var(--sell); }
+  .ticker-loading {
+    padding: 0 20px; font-size: 11px; color: var(--fg-3);
+    font-family: 'JetBrains Mono', monospace;
+  }
   .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: 0.02em; }
   .brand-mark {
     width: 32px; height: 32px;
@@ -509,6 +542,12 @@
     <button class="btn-primary" id="topUpgrade">Subscribe · $3/mo</button>
   </div>
 </header>
+
+<!-- Ticker banner -->
+<div class="ticker-banner" id="tickerBanner">
+  <div class="ticker-loading" id="tickerLoading">Loading market data…</div>
+  <div class="ticker-track" id="tickerTrack" style="display:none"></div>
+</div>
 
 <!-- Hero -->
 <section class="hero">
@@ -1296,6 +1335,46 @@
       console.warn('Profile check failed:', err);
     }
   });
+
+  // ---- Ticker banner ----
+  const SNAPSHOT_URL = 'https://ojmbqmbiyjpokhspcjbs.supabase.co/functions/v1/market-snapshot';
+  const ANON_KEY     = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9qbWJxbWJpeWpwb2toc3BjamJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgwODg2MzEsImV4cCI6MjA5MzY2NDYzMX0._09_Y3dx5L1e85HR5jDI8y6bDY9hhBh2PgrjUOT1Phk';
+
+  async function refreshTicker() {
+    try {
+      const res  = await fetch(SNAPSHOT_URL, { headers: { Authorization: `Bearer ${ANON_KEY}` } });
+      const json = await res.json();
+      if (!json.data?.length) return;
+
+      const items = json.data.map(d => {
+        const up  = d.change >= 0;
+        const chg = (up ? '+' : '') + d.change.toFixed(2) + '%';
+        const arr = up ? '▲' : '▼';
+        return `<span class="ticker-item">
+          <span class="t-sym">${d.ticker}</span>
+          <span class="t-price">$${Number(d.price).toFixed(2)}</span>
+          <span class="t-chg ${up ? 'up' : 'down'}">${arr} ${chg}</span>
+        </span>`;
+      }).join('');
+
+      const track = document.getElementById('tickerTrack');
+      // Duplicate content for seamless loop
+      track.innerHTML = items + items;
+
+      // Adjust animation speed based on content width
+      const totalWidth = track.scrollWidth / 2;
+      const speed      = Math.max(30, totalWidth / 120);
+      track.style.animationDuration = speed + 's';
+
+      document.getElementById('tickerLoading').style.display = 'none';
+      track.style.display = 'flex';
+    } catch(e) {
+      console.warn('Ticker banner:', e);
+    }
+  }
+
+  refreshTicker();
+  setInterval(refreshTicker, 15 * 60 * 1000); // refresh every 15 min
 </script>
 
 <script type="module" src="js/supabase-client.js"></script>
