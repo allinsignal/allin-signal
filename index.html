@@ -264,6 +264,19 @@
     border-bottom: 1px solid var(--line-soft);
   }
   .lt-row:last-child { border-bottom: 0; }
+  .pagination {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 18px; border-top: 1px solid var(--line-soft);
+    background: var(--bg-1); border-radius: 0 0 10px 10px;
+    font-size: 12px; color: var(--fg-2);
+  }
+  .pagination button {
+    padding: 5px 14px; border-radius: 6px; font-size: 12px; font-weight: 600;
+    border: 1px solid var(--line-soft); color: var(--fg-1); background: var(--bg-2);
+    cursor: pointer;
+  }
+  .pagination button:disabled { opacity: 0.35; cursor: default; }
+  .pagination button:not(:disabled):hover { background: var(--bg-3); color: var(--fg-0); }
   .lt-row.top-pick { background: oklch(from var(--warn) l c h / 0.06); border-left: 3px solid var(--warn); padding-left: 15px; }
   .lt-row.top-pick .lt-rank { color: var(--warn); font-weight: 700; }
   .badge-top { display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: 0.06em; padding: 2px 5px; border-radius: 3px; background: var(--warn); color: oklch(0.15 0 0); margin-left: 5px; vertical-align: middle; }
@@ -684,6 +697,11 @@
       <button class="paywall-cta" id="paywallCta">Subscribe — $3/month</button>
       <div class="paywall-fine">Less than a coffee. No annual lock-in.</div>
     </div>
+  </div>
+  <div class="pagination" id="tablePagination" style="display:none">
+    <button id="pgPrev">← Prev</button>
+    <span id="pgLabel"></span>
+    <button id="pgNext">Next →</button>
   </div>
 </div>
 
@@ -1315,20 +1333,29 @@
     }
   }
 
-  async function loadMemberTable(rows, sums) {
-    sums = sums || {};
+  const PAGE_SIZE = 25;
+  let memberRows = [];
+  let memberSumsCache = {};
+  let currentPage = 0;
+
+  function renderTablePage() {
     const tbl = document.getElementById('lockedTable');
     const head = tbl.querySelector('.lt-head');
     tbl.innerHTML = '';
     if (head) tbl.appendChild(head);
+
+    const start = currentPage * PAGE_SIZE;
+    const pageRows = memberRows.slice(start, start + PAGE_SIZE);
     let topBuyCount = 0;
-    rows.forEach((r, i) => {
+
+    pageRows.forEach((r, i) => {
+      const globalIdx = start + i;
       const p = Number(r.price), e = Number(r.trend_base ?? r.price);
       const distRaw = e > 0 ? (p - e) / e * 100 : 0;
       const isBuy = r.rating === 'BUY';
-      const isTopPick = isBuy && topBuyCount < 10;
+      const isTopPick = isBuy && globalIdx < 10;
       if (isTopPick) topBuyCount++;
-      const sum = sums[r.ticker] || {};
+      const sum = memberSumsCache[r.ticker] || {};
       const ytdPct = sum.ytd_change;
       const ytdHtml = ytdPct != null
         ? `<span class="${ytdPct >= 0 ? 'delta-buy' : 'delta-sell'}">${ytdPct >= 0 ? '+' : ''}${Number(ytdPct).toFixed(1)}%</span>`
@@ -1341,7 +1368,7 @@
       row.style.cursor = 'pointer';
       const rankBadge = isTopPick ? '<span class="badge-top">BEST</span>' : '';
       row.innerHTML = `
-        <div class="mono lt-rank" style="${isTopPick ? '' : 'color:var(--fg-2)'}">#${String(1 + i).padStart(2, '0')}${rankBadge}</div>
+        <div class="mono lt-rank" style="${isTopPick ? '' : 'color:var(--fg-2)'}">#${String(globalIdx + 1).padStart(2, '0')}${rankBadge}</div>
         <div class="ticker">
           <div class="sc-logo" style="background:${hashColor(r.ticker)};color:var(--logo-fg)">${r.ticker.slice(0, 2)}</div>
           <div class="name-block"><b class="mono">${r.ticker}</b><span>${r.company_name || r.ticker}</span></div>
@@ -1353,12 +1380,34 @@
         <div class="hide-sm">${isBuy ? '<span class="pill-buy">Buy</span>' : '<span class="pill-sell">Sell</span>'}</div>
         <div class="hide-sm" style="display:flex;align-items:center">${sparkHtml}</div>`;
       const s = { t: r.ticker, n: r.company_name || r.ticker, price: p, ema: e, chg: 0, conf: Number(r.confidence ?? 0), mcap: 'Mid', rating: r.rating || 'BUY' };
-      row.addEventListener('click', () => openDrawer(s, 11 + i));
+      row.addEventListener('click', () => openDrawer(s, globalIdx));
       tbl.appendChild(row);
     });
-    const buyCount = document.getElementById('buyCount');
-    if (buyCount) buyCount.textContent = rows.length.toLocaleString() + '+';
+
+    const totalPages = Math.ceil(memberRows.length / PAGE_SIZE);
+    const pg = document.getElementById('tablePagination');
+    const pgLabel = document.getElementById('pgLabel');
+    pg.style.display = totalPages > 1 ? 'flex' : 'none';
+    pgLabel.textContent = `Page ${currentPage + 1} of ${totalPages}  ·  ${memberRows.length.toLocaleString()} signals`;
+    document.getElementById('pgPrev').disabled = currentPage === 0;
+    document.getElementById('pgNext').disabled = currentPage >= totalPages - 1;
   }
+
+  function loadMemberTable(rows, sums) {
+    memberRows = rows || [];
+    memberSumsCache = Object.assign(memberSumsCache, sums || {});
+    currentPage = 0;
+    renderTablePage();
+    const buyCount = document.getElementById('buyCount');
+    if (buyCount) buyCount.textContent = memberRows.length.toLocaleString() + '+';
+  }
+
+  document.getElementById('pgPrev').addEventListener('click', () => {
+    if (currentPage > 0) { currentPage--; renderTablePage(); document.getElementById('lockedTable').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+  });
+  document.getElementById('pgNext').addEventListener('click', () => {
+    if (currentPage < Math.ceil(memberRows.length / PAGE_SIZE) - 1) { currentPage++; renderTablePage(); document.getElementById('lockedTable').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+  });
 
   // ---- Supabase: load real data and check membership ----
   window.addEventListener('allin:ready', async () => {
@@ -1406,13 +1455,13 @@
       const profile = await window.allin.currentProfile();
       if (profile?.is_subscribed) {
         unlockMember();
-        const memberRows = await window.allin.allSignals(200);
-        if (memberRows?.length) {
-          loadMemberTable(memberRows);
+        const allRows = await window.allin.allSignals(200);
+        if (allRows?.length) {
+          loadMemberTable(allRows);
           if (window.tickerSummary) {
-            const memberSums = await window.tickerSummary.getTickerSummaries(memberRows.map(r => r.ticker));
+            const memberSums = await window.tickerSummary.getTickerSummaries(allRows.map(r => r.ticker));
             Object.assign(summaries, memberSums);
-            loadMemberTable(memberRows, memberSums);
+            loadMemberTable(allRows, memberSums);
           }
         }
       }
