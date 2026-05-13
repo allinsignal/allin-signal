@@ -1391,6 +1391,7 @@
           loadMemberTable(memberRows);
           if (window.tickerSummary) {
             const memberSums = await window.tickerSummary.getTickerSummaries(memberRows.map(r => r.ticker));
+            Object.assign(summaries, memberSums);
             loadMemberTable(memberRows, memberSums);
           }
         }
