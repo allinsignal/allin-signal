@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Disclaimer & Terms · Allin Signal</title>
+  <link rel="icon" type="image/png" href="assets/allin-logo.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -29,7 +30,10 @@
       background: var(--bg-1); border-bottom: 1px solid var(--line-soft);
       display: flex; align-items: center; gap: 16px; padding: 0 24px; height: 52px;
     }
-    .logo { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 15px; color: var(--fg-0); text-decoration: none; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: 0.02em; }
+    .brand-mark { width: 32px; height: 32px; background: url('assets/allin-logo.png') center/contain no-repeat; }
+    .brand-name { font-size: 15px; color: var(--fg-0); }
+    .brand-name span { color: var(--fg-2); font-weight: 500; }
     nav { display: flex; gap: 4px; margin-left: auto; }
     nav a { padding: 6px 12px; border-radius: 6px; font-size: 13px; color: var(--fg-1); text-decoration: none; }
     nav a:hover { background: var(--bg-2); }
@@ -55,7 +59,10 @@
 <body>
 
 <header>
-  <a class="logo" href="index.html">Allin Signal</a>
+  <a href="index.html" class="brand">
+    <div class="brand-mark" role="img" aria-label="Allin Signal logo"></div>
+    <div class="brand-name">Allin Signal <span>· allinsignal.com</span></div>
+  </a>
   <nav>
     <a href="index.html">Signals</a>
     <a href="methodology.html">Methodology</a>
