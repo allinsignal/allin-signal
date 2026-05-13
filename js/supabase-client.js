@@ -57,7 +57,7 @@ async function topSignals(limit = 10) {
     .from('signals')
     .select('*')
     .eq('is_top10', true)
-    .eq('rating', 'BUY')
+    .order('rating', { ascending: true })
     .order('confidence', { ascending: false })
     .limit(limit);
   if (error) { console.warn('topSignals:', error); return []; }

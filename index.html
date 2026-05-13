@@ -733,16 +733,16 @@
 <script>
   // ---- Demo signal data (replaced by Supabase when configured) ----
   const signals = [
-    { t: 'NRTH',  n: 'Northwind Logistics',   price: 42.87,  ema: 42.11, chg: +1.81, mcap: 'Mid' },
-    { t: 'KLVR',  n: 'Kelvr Semiconductors',  price: 118.42, ema: 116.05,chg: +2.04, mcap: 'Large' },
-    { t: 'ARGN',  n: 'Argentum Mining',        price: 8.94,   ema: 8.80,  chg: +1.59, mcap: 'Small' },
-    { t: 'MAVN',  n: 'Maven Energy',           price: 64.20,  ema: 62.97, chg: +1.95, mcap: 'Large' },
-    { t: 'PIVO',  n: 'Pivota Health',          price: 27.55,  ema: 27.12, chg: +1.59, mcap: 'Mid' },
-    { t: 'BRDG',  n: 'Bridgepath Capital',     price: 91.10,  ema: 89.40, chg: +1.90, mcap: 'Large' },
-    { t: 'TUNDR', n: 'Tundra Materials',       price: 14.66,  ema: 14.40, chg: +1.81, mcap: 'Small' },
-    { t: 'ECLO',  n: 'Eclora Pharma',          price: 56.78,  ema: 55.92, chg: +1.54, mcap: 'Mid' },
-    { t: 'AXIS',  n: 'Axis Robotics',          price: 203.40, ema: 199.85,chg: +1.78, mcap: 'Large' },
-    { t: 'OREN',  n: 'Orenda Foods',           price: 33.21,  ema: 32.71, chg: +1.53, mcap: 'Mid' },
+    { t: 'KLVR',  n: 'Kelvr Semiconductors',  price: 118.42, ema: 116.05, chg: +2.04, mcap: 'Mega', rating: 'BUY'  },
+    { t: 'MAVN',  n: 'Maven Energy',           price: 364.20, ema: 358.97, chg: +1.95, mcap: 'Mega', rating: 'BUY'  },
+    { t: 'BRDG',  n: 'Bridgepath Capital',     price: 291.10, ema: 289.40, chg: +1.90, mcap: 'Mega', rating: 'BUY'  },
+    { t: 'AXIS',  n: 'Axis Robotics',          price: 203.40, ema: 199.85, chg: +1.78, mcap: 'Mega', rating: 'BUY'  },
+    { t: 'NRTH',  n: 'Northwind Logistics',    price: 142.87, ema: 141.11, chg: +1.81, mcap: 'Mega', rating: 'BUY'  },
+    { t: 'SOLR',  n: 'Solera Solar',           price: 88.40,  ema: 104.20, chg: -3.32, mcap: 'Mega', rating: 'SELL' },
+    { t: 'PIVO',  n: 'Pivota Health',          price: 227.55, ema: 271.12, chg: -2.10, mcap: 'Mega', rating: 'SELL' },
+    { t: 'ECLO',  n: 'Eclora Pharma',          price: 156.78, ema: 188.92, chg: -1.54, mcap: 'Mega', rating: 'SELL' },
+    { t: 'OREN',  n: 'Orenda Foods',           price: 233.21, ema: 282.71, chg: -2.80, mcap: 'Mega', rating: 'SELL' },
+    { t: 'TUNDR', n: 'Tundra Materials',       price: 414.66, ema: 494.40, chg: -1.95, mcap: 'Mega', rating: 'SELL' },
   ];
 
   function hashColor(t) {
@@ -796,7 +796,9 @@
     const grid = document.getElementById('signalGrid');
     grid.innerHTML = '';
     signals.forEach((s, i) => {
-      const dist = ((s.price - s.ema) / s.ema * 100).toFixed(2);
+      const distNum = (s.price - s.ema) / s.ema * 100;
+      const dist = (distNum >= 0 ? '+' : '') + distNum.toFixed(2) + '%';
+      const isBuy = s.rating !== 'SELL';
       const card = document.createElement('div');
       card.className = 'signal-card';
       card.dataset.idx = i;
@@ -821,9 +823,9 @@
           </div>
           <div>
             <div class="sc-ema-label" style="text-align:right">Strength</div>
-            <div class="sc-distance mono">+${dist}%</div>
+            <div class="sc-distance mono${isBuy ? '' : ' down'}">${dist}</div>
           </div>
-          <span class="pill-buy">Buy</span>
+          ${isBuy ? '<span class="pill-buy">Buy</span>' : '<span class="pill-sell">Sell</span>'}
         </div>`;
       card.addEventListener('click', () => openDrawer(s, i));
       grid.appendChild(card);
@@ -1131,7 +1133,8 @@
         price: Number(r.price),
         ema: Number(r.trend_base ?? r.price),
         chg: Number(r.weekly_change ?? 0),
-        mcap: r.market_cap_band || 'Mid',
+        mcap: r.market_cap_band || 'Mega',
+        rating: r.rating || 'BUY',
       }));
       renderGrid();
 
