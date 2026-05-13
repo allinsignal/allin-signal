@@ -33,9 +33,7 @@
               <span id="cmTicker" style="font-family:'JetBrains Mono',monospace;font-weight:700;font-size:17px"></span>
               <span id="cmName" style="color:var(--fg-2);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
             </div>
-            <div style="font-size:11px;color:var(--fg-3);margin-top:1px">
-              Daily candles · <span style="color:var(--accent)">— 200-wk SMA</span>
-            </div>
+            <div style="font-size:11px;color:var(--fg-3);margin-top:1px">Daily candlestick chart</div>
           </div>
           <button id="cmClose" aria-label="Close chart" style="
             width:32px;height:32px;border-radius:8px;font-size:18px;line-height:1;
@@ -82,20 +80,6 @@
       .gte('trade_date', from.toISOString().slice(0, 10))
       .order('trade_date', { ascending: true });
     return data || [];
-  }
-
-  // ---- 200-week SMA (sample every 5 daily bars, 200 samples) ----
-  function compute200WkSMA(candles) {
-    const result = [];
-    for (let i = 999; i < candles.length; i++) {
-      let sum = 0, count = 0;
-      for (let j = i; j >= 0 && count < 200; j -= 5) {
-        sum += candles[j].close;
-        count++;
-      }
-      if (count === 200) result.push({ time: candles[i].time, value: sum / 200 });
-    }
-    return result;
   }
 
   function setLoading(msg) {
@@ -169,20 +153,6 @@
         wickDownColor:   '#e8614d',
       });
       candleSeries.setData(candles);
-
-      const smaData = compute200WkSMA(candles);
-      if (smaData.length) {
-        const smaSeries = chart.addLineSeries({
-          color:            '#5ba0d5',
-          lineWidth:        2,
-          lineStyle:        0,
-          priceLineVisible: false,
-          lastValueVisible: true,
-          title:            '200W SMA',
-        });
-        smaSeries.setData(smaData);
-      }
-
       chart.timeScale().fitContent();
 
       // Responsive resize
