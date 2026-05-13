@@ -385,9 +385,9 @@
       const row = document.createElement('div');
       row.className = 'wl-row';
       row.innerHTML = `
-        <div class="ticker-cell">
+        <div class="ticker-cell" style="cursor:pointer" title="View chart" onclick="openChart('${s.t}','${s.n.replace(/'/g,"\\'")}')">
           <div class="sc-logo" style="background:${hashColor(s.t)}">${s.t.slice(0, 2)}</div>
-          <div class="name-block"><b class="mono">${s.t}</b><span>${s.n} · added ${s.added_on}</span></div>
+          <div class="name-block"><b class="mono" style="text-decoration:underline;text-decoration-color:var(--fg-3);text-underline-offset:3px">${s.t}</b><span>${s.n} · added ${s.added_on}</span></div>
         </div>
         <div class="right mono">$${s.price.toFixed(2)}</div>
         <div class="right mono ${delta >= 0 ? 'delta-buy' : 'delta-sell'}">${delta >= 0 ? '+' : ''}${delta.toFixed(2)}%</div>
@@ -643,5 +643,6 @@
 
 <script type="module" src="js/supabase-client.js"></script>
 <script src="js/auth.js"></script>
+<script src="js/chart-modal.js"></script>
 </body>
 </html>
