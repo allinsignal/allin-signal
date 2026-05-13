@@ -672,7 +672,7 @@
           : '';
         const ytd = window.tickerSummary?.renderYTD(sum.ytd_change) || '';
         return `
-          <div class="sig-row">
+          <div class="sig-row" data-ticker="${escHtml(s.ticker)}" style="cursor:pointer" title="Click to mention in chat">
             <div class="sig-row-top">
               <span class="sig-ticker">${escHtml(s.ticker)}</span>
               <span class="sig-name">${escHtml(s.company_name || '')}</span>
@@ -684,6 +684,17 @@
             </div>` : ''}
           </div>`;
       }).join('');
+
+      list.addEventListener('click', e => {
+        const row = e.target.closest('[data-ticker]');
+        if (!row) return;
+        const ticker = row.dataset.ticker;
+        const input = document.getElementById('chatInput');
+        if (input) {
+          input.value = (input.value + ' $' + ticker + ' ').trimStart();
+          input.focus();
+        }
+      });
     } catch(e) {
       list.innerHTML = '<div class="sidebar-loading">Could not load signals</div>';
     }
