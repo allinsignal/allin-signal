@@ -56,10 +56,99 @@
   .theme-toggle { width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center; color: var(--fg-2); border: 1px solid var(--line-soft); }
   .theme-toggle:hover { background: var(--bg-2); color: var(--fg-0); }
 
+  /* Ticker banner */
+  .ticker-banner {
+    position: sticky; top: 56px; z-index: 49;
+    height: 32px; overflow: hidden;
+    background: var(--bg-2); border-bottom: 1px solid var(--line-soft);
+    display: flex; align-items: center;
+  }
+  .ticker-track {
+    display: flex; align-items: center; gap: 0;
+    white-space: nowrap;
+    animation: ticker-scroll 60s linear infinite;
+    will-change: transform;
+  }
+  .ticker-banner:hover .ticker-track { animation-play-state: paused; }
+  @keyframes ticker-scroll {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+  .ticker-item {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 0 20px; font-size: 12px; font-family: 'JetBrains Mono', monospace;
+    border-right: 1px solid var(--line-soft); height: 32px;
+  }
+  .ticker-item .t-sym   { font-weight: 600; color: var(--fg-1); }
+  .ticker-item .t-price { color: var(--fg-2); }
+  .ticker-item .t-chg   { font-weight: 600; }
+  .ticker-item .t-chg.up   { color: var(--buy); }
+  .ticker-item .t-chg.down { color: var(--sell); }
+  .ticker-loading {
+    padding: 0 20px; font-size: 11px; color: var(--fg-3);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
   /* Layout */
   .chat-layout {
+    display: flex; flex-direction: row;
+    height: calc(100vh - 88px); /* 56px topbar + 32px banner */
+  }
+
+  /* Chat main column */
+  .chat-main {
+    flex: 1; display: flex; flex-direction: column; min-width: 0;
+    border-right: 1px solid var(--line-soft);
+  }
+
+  /* Signals sidebar */
+  .signals-sidebar {
+    width: 280px; flex: none;
     display: flex; flex-direction: column;
-    height: calc(100vh - 56px);
+    background: var(--bg-0);
+    overflow: hidden;
+  }
+  .sidebar-header {
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--line-soft);
+    font-size: 12px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--fg-2);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .sidebar-header a {
+    margin-left: auto; font-size: 11px; font-weight: 500;
+    color: var(--accent); text-transform: none; letter-spacing: 0;
+  }
+  .sidebar-header a:hover { text-decoration: underline; }
+  .sidebar-list {
+    flex: 1; overflow-y: auto; padding: 6px 0;
+  }
+  .sidebar-list::-webkit-scrollbar { width: 4px; }
+  .sidebar-list::-webkit-scrollbar-track { background: transparent; }
+  .sidebar-list::-webkit-scrollbar-thumb { background: var(--line); border-radius: 10px; }
+  .sig-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 16px; transition: background 0.1s;
+  }
+  .sig-row:hover { background: var(--bg-1); }
+  .sig-ticker {
+    font-size: 13px; font-weight: 700; font-family: 'JetBrains Mono', monospace;
+    color: var(--fg-0); min-width: 52px;
+  }
+  .sig-name {
+    font-size: 11px; color: var(--fg-2); flex: 1; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .sig-conf {
+    font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace;
+    color: var(--buy); flex: none;
+  }
+  .sidebar-loading {
+    padding: 20px 16px; font-size: 12px; color: var(--fg-3); text-align: center;
+  }
+
+  @media (max-width: 860px) {
+    .signals-sidebar { display: none; }
   }
 
   /* Disclaimer */
@@ -76,7 +165,7 @@
 
   /* Gate state (not subscribed) */
   .chat-gate {
-    flex: 1; display: grid; place-items: center; padding: 40px 20px;
+    flex: 1; display: grid; place-items: center; padding: 40px 20px; overflow-y: auto;
   }
   .gate-card {
     background: var(--bg-1); border: 1px solid var(--line-soft); border-radius: 16px;
@@ -210,7 +299,15 @@
   </div>
 </header>
 
+<div class="ticker-banner" id="tickerBanner">
+  <div class="ticker-loading" id="tickerLoading">Loading market data…</div>
+  <div class="ticker-track" id="tickerTrack" style="display:none"></div>
+</div>
+
 <div class="chat-layout" id="chatLayout">
+
+  <!-- Chat main -->
+  <div class="chat-main" id="chatMain">
 
   <!-- Disclaimer -->
   <div class="disclaimer">
@@ -229,6 +326,20 @@
       <a class="gate-btn" href="Pricing.html">Subscribe to join</a>
     </div>
   </div>
+
+  </div><!-- end .chat-main -->
+
+  <!-- Buy signals sidebar -->
+  <aside class="signals-sidebar" id="signalsSidebar">
+    <div class="sidebar-header">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+      Buy Signals
+      <a href="index.html">View all →</a>
+    </div>
+    <div class="sidebar-list" id="sidebarList">
+      <div class="sidebar-loading">Loading signals…</div>
+    </div>
+  </aside>
 
 </div>
 
@@ -495,9 +606,73 @@
     input.focus();
   }
 
+  // ---- Ticker banner ----
+  const SNAPSHOT_URL = 'https://ojmbqmbiyjpokhspcjbs.supabase.co/functions/v1/market-snapshot';
+  const ANON_KEY     = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9qbWJxbWJpeWpwb2toc3BjamJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgwODg2MzEsImV4cCI6MjA5MzY2NDYzMX0._09_Y3dx5L1e85HR5jDI8y6bDY9hhBh2PgrjUOT1Phk';
+
+  async function refreshTicker() {
+    try {
+      const res  = await fetch(SNAPSHOT_URL, { headers: { Authorization: `Bearer ${ANON_KEY}` } });
+      const json = await res.json();
+      if (!json.data?.length) return;
+
+      const items = json.data.map(d => {
+        const up  = d.change >= 0;
+        const chg = (up ? '+' : '') + d.change.toFixed(2) + '%';
+        const arr = up ? '▲' : '▼';
+        return `<span class="ticker-item">
+          <span class="t-sym">${d.ticker}</span>
+          <span class="t-price">$${Number(d.price).toFixed(2)}</span>
+          <span class="t-chg ${up ? 'up' : 'down'}">${arr} ${chg}</span>
+        </span>`;
+      }).join('');
+
+      const track = document.getElementById('tickerTrack');
+      track.innerHTML = items + items;
+      const totalWidth = track.scrollWidth / 2;
+      const speed = Math.max(30, totalWidth / 120);
+      track.style.animationDuration = speed + 's';
+      document.getElementById('tickerLoading').style.display = 'none';
+      track.style.display = 'flex';
+    } catch(e) {
+      console.warn('Ticker banner:', e);
+    }
+  }
+  refreshTicker();
+  setInterval(refreshTicker, 15 * 60 * 1000);
+
+  // ---- Buy signals sidebar ----
+  async function loadSignalsSidebar() {
+    const list = document.getElementById('sidebarList');
+    try {
+      const { data, error } = await window.allin.supabase
+        .from('signals')
+        .select('ticker, name, confidence')
+        .eq('signal', 'BUY')
+        .order('confidence', { ascending: false })
+        .limit(30);
+
+      if (error || !data?.length) {
+        list.innerHTML = '<div class="sidebar-loading">No signals available</div>';
+        return;
+      }
+
+      list.innerHTML = data.map(s => `
+        <div class="sig-row">
+          <span class="sig-ticker">${escHtml(s.ticker)}</span>
+          <span class="sig-name">${escHtml(s.name || '')}</span>
+          <span class="sig-conf">${Math.round((s.confidence || 0) * 100)}%</span>
+        </div>`).join('');
+    } catch(e) {
+      list.innerHTML = '<div class="sidebar-loading">Could not load signals</div>';
+    }
+  }
+
   // ---- Auth check ----
   window.addEventListener('allin:ready', async () => {
     if (!window.allin?.isConfigured) return;
+
+    loadSignalsSidebar();
 
     currentUser = await window.allin.currentUser();
     if (!currentUser) {
