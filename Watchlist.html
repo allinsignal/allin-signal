@@ -240,15 +240,22 @@
     </button>
   </div>
 
-  <div class="member-toolbar">
+  <div class="member-toolbar" style="position:relative">
     <div class="search-box">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
       <input id="wlSearch" placeholder="Search a ticker to add — AAPL, MSFT, NVDA…" autocomplete="off" />
     </div>
-    <button class="add-btn" id="addBtn">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>
-      Add
-    </button>
+    <div style="position:relative">
+      <button class="add-btn" id="addBtn">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>
+        Add to watchlist
+      </button>
+      <!-- Watchlist picker dropdown -->
+      <div id="wlAddPicker" style="display:none;position:absolute;right:0;top:calc(100% + 6px);background:var(--bg-2);border:1px solid var(--line);border-radius:10px;min-width:200px;z-index:100;box-shadow:0 8px 24px oklch(0 0 0/0.35);overflow:hidden;">
+        <div style="padding:10px 14px 6px;font-size:10.5px;text-transform:uppercase;letter-spacing:0.08em;color:var(--fg-2);font-weight:600">Add to watchlist</div>
+        <div id="wlAddPickerList"></div>
+      </div>
+    </div>
   </div>
 
   <div class="summary">
@@ -442,8 +449,8 @@
     inp.value = '';
     render();
   }
-  document.getElementById('addBtn').addEventListener('click', addTicker);
-  document.getElementById('wlSearch').addEventListener('keydown', e => { if (e.key === 'Enter') addTicker(); });
+  // Add button wired after Supabase loads (see loadFromSupabase)
+
 
   document.getElementById('lockedSubscribe').addEventListener('click', () => { window.location.href = 'Pricing.html'; });
   document.getElementById('topUpgrade').addEventListener('click', () => { window.location.href = 'Pricing.html'; });
@@ -458,9 +465,9 @@
     if (!profile?.is_subscribed) return;
 
     setMode('member');
-    document.getElementById('addBtn').onclick    = addRealTicker;
+    document.getElementById('addBtn').onclick    = openAddPicker;
     document.getElementById('newWlBtn').onclick  = createNewWatchlist;
-    document.getElementById('wlSearch').onkeydown = e => { if (e.key === 'Enter') addRealTicker(); };
+    document.getElementById('wlSearch').onkeydown = e => { if (e.key === 'Enter') openAddPicker(); };
 
     allWatchlists = await window.allin.getWatchlists();
 
@@ -532,23 +539,56 @@
     }
   }
 
-  async function addRealTicker() {
+  function openAddPicker() {
+    const t = (document.getElementById('wlSearch').value || '').trim().toUpperCase();
+    if (!t) { document.getElementById('wlSearch').focus(); return; }
+
+    const picker = document.getElementById('wlAddPicker');
+    const list   = document.getElementById('wlAddPickerList');
+
+    list.innerHTML = '';
+    allWatchlists.forEach(wl => {
+      const item = document.createElement('button');
+      item.style.cssText = 'display:block;width:100%;text-align:left;padding:10px 14px;font-size:13px;color:var(--fg-0);border-bottom:1px solid var(--line-soft);';
+      item.textContent = wl.name;
+      item.onmouseenter = () => item.style.background = 'var(--bg-3)';
+      item.onmouseleave = () => item.style.background = '';
+      item.addEventListener('click', () => doAddTicker(t, wl.id, wl.name));
+      list.appendChild(item);
+    });
+
+    // Remove border from last item
+    if (list.lastChild) list.lastChild.style.borderBottom = '0';
+
+    picker.style.display = 'block';
+    setTimeout(() => {
+      document.addEventListener('click', closePicker, { once: true, capture: true });
+    }, 0);
+  }
+
+  function closePicker() {
+    document.getElementById('wlAddPicker').style.display = 'none';
+  }
+
+  async function doAddTicker(t, watchlistId, watchlistName) {
+    closePicker();
     const inp = document.getElementById('wlSearch');
     const btn = document.getElementById('addBtn');
-    const t   = (inp.value || '').trim().toUpperCase();
-    if (!t) return;
     const origHTML = btn.innerHTML;
     btn.textContent = 'Adding…';
     btn.disabled = true;
     try {
-      const { error } = await window.allin.addToWatchlist(t, activeWlId);
+      const { error } = await window.allin.addToWatchlist(t, watchlistId);
       if (error?.code === '23505') {
         inp.value = '';
-        inp.placeholder = `${t} is already in this watchlist`;
+        inp.placeholder = `${t} is already in ${watchlistName}`;
       } else if (error) {
         inp.placeholder = `Could not add ${t} — check the ticker symbol`;
       } else {
         inp.value = '';
+        // Switch to the watchlist we just added to
+        activeWlId = watchlistId;
+        renderTabs();
         await loadActiveList();
       }
       setTimeout(() => { inp.placeholder = 'Search a ticker to add — AAPL, MSFT, NVDA…'; }, 2500);
@@ -563,11 +603,16 @@
   async function createNewWatchlist() {
     const name = prompt('Watchlist name:');
     if (!name?.trim()) return;
-    const wl = await window.allin.createWatchlist(name.trim());
-    allWatchlists.push(wl);
-    activeWlId = wl.id;
-    renderTabs();
-    await loadActiveList();
+    try {
+      const wl = await window.allin.createWatchlist(name.trim());
+      if (!wl?.id) throw new Error('No data returned from server');
+      allWatchlists.push(wl);
+      activeWlId = wl.id;
+      renderTabs();
+      await loadActiveList();
+    } catch(e) {
+      alert('Could not create watchlist: ' + (e?.message || String(e)));
+    }
   }
 
   async function deleteList(id) {
