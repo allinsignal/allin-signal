@@ -426,22 +426,47 @@
     });
   }
 
-  document.getElementById('feed').innerHTML = `
-    <div class="feed-item">
-      <div class="feed-icon up"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M3 17l6-6 4 4 8-8"/></svg></div>
-      <div class="feed-text"><b class="mono">NRTH</b> flipped to <b style="color:var(--buy)">BUY</b> <span>— Northwind Logistics confirmed trend baseline</span></div>
-      <div class="feed-time">May 02 · close</div>
-    </div>
-    <div class="feed-item">
-      <div class="feed-icon down"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M3 7l6 6 4-4 8 8"/></svg></div>
-      <div class="feed-text"><b class="mono">ZEN</b> flipped to <b style="color:var(--sell)">SELL</b> <span>— Zenodo Music broke trend on the weekly close</span></div>
-      <div class="feed-time">Apr 26</div>
-    </div>
-    <div class="feed-item">
-      <div class="feed-icon up"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M3 17l6-6 4 4 8-8"/></svg></div>
-      <div class="feed-text"><b class="mono">ECLO</b> flipped to <b style="color:var(--buy)">BUY</b> <span>— Eclora Pharma reclaimed trend baseline</span></div>
-      <div class="feed-time">Apr 19</div>
-    </div>`;
+  async function loadFeed() {
+    const feed = document.getElementById('feed');
+    if (!watchlist.length) {
+      feed.innerHTML = '<div style="padding:20px;color:var(--fg-3);font-size:13px">No rating changes yet — add tickers to your watchlist to track flips.</div>';
+      return;
+    }
+
+    const tickers = watchlist.map(w => w.t);
+    const { data, error } = await window.allin.supabase
+      .from('rating_changes')
+      .select('ticker, from_rating, to_rating, changed_at')
+      .in('ticker', tickers)
+      .order('changed_at', { ascending: false })
+      .limit(20);
+
+    if (error || !data?.length) {
+      feed.innerHTML = '<div style="padding:20px;color:var(--fg-3);font-size:13px">No rating changes recorded yet for your watchlist.</div>';
+      return;
+    }
+
+    const upSvg   = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M3 17l6-6 4 4 8-8"/></svg>`;
+    const downSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M3 7l6 6 4-4 8 8"/></svg>`;
+
+    feed.innerHTML = data.map(rc => {
+      const isBuy  = rc.to_rating === 'BUY';
+      const name   = watchlist.find(w => w.t === rc.ticker)?.n || rc.ticker;
+      const date   = new Date(rc.changed_at);
+      const label  = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' · close';
+      const action = isBuy ? 'reclaimed trend baseline' : 'broke trend baseline';
+      return `
+        <div class="feed-item">
+          <div class="feed-icon ${isBuy ? 'up' : 'down'}">${isBuy ? upSvg : downSvg}</div>
+          <div class="feed-text">
+            <b class="mono">${rc.ticker}</b> flipped to
+            <b style="color:var(--${isBuy ? 'buy' : 'sell'})">${rc.to_rating}</b>
+            <span>— ${name} ${action}</span>
+          </div>
+          <div class="feed-time">${label}</div>
+        </div>`;
+    }).join('');
+  }
 
   function addTicker() {
     const inp = document.getElementById('wlSearch');
@@ -530,6 +555,7 @@
       document.getElementById('sumBuy').textContent   = '0';
       document.getElementById('sumSell').textContent  = '0';
       document.getElementById('sumAvg').textContent   = '+0.0%';
+      loadFeed();
     } else {
       watchlist = rows.map(r => ({
         _id:      r.id,
@@ -548,6 +574,7 @@
         wlSummaries = await window.tickerSummary.getTickerSummaries(watchlist.map(w => w.t));
         render();
       }
+      loadFeed();
     }
   }
 
