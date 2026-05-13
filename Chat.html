@@ -127,13 +127,13 @@
   .sidebar-list::-webkit-scrollbar-track { background: transparent; }
   .sidebar-list::-webkit-scrollbar-thumb { background: var(--line); border-radius: 10px; }
   .sig-row {
-    display: flex; align-items: center; gap: 10px;
-    padding: 8px 16px; transition: background 0.1s;
+    padding: 8px 16px; transition: background 0.1s; cursor: default;
   }
   .sig-row:hover { background: var(--bg-1); }
+  .sig-row-top { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
   .sig-ticker {
     font-size: 13px; font-weight: 700; font-family: 'JetBrains Mono', monospace;
-    color: var(--fg-0); min-width: 52px;
+    color: var(--fg-0); min-width: 52px; flex: none;
   }
   .sig-name {
     font-size: 11px; color: var(--fg-2); flex: 1; min-width: 0;
@@ -143,6 +143,9 @@
     font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace;
     color: var(--buy); flex: none;
   }
+  .sig-row-bottom { display: flex; align-items: center; gap: 8px; }
+  .sig-spark { flex: 1; min-width: 0; }
+  .sig-ytd { font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; flex: none; }
   .sidebar-loading {
     padding: 20px 16px; font-size: 12px; color: var(--fg-3); text-align: center;
   }
@@ -657,12 +660,30 @@
         return;
       }
 
-      list.innerHTML = data.map(s => `
-        <div class="sig-row">
-          <span class="sig-ticker">${escHtml(s.ticker)}</span>
-          <span class="sig-name">${escHtml(s.company_name || '')}</span>
-          <span class="sig-conf">${Math.round((s.confidence || 0) * 100)}%</span>
-        </div>`).join('');
+      let sums = {};
+      if (window.tickerSummary) {
+        sums = await window.tickerSummary.getTickerSummaries(data.map(s => s.ticker));
+      }
+
+      list.innerHTML = data.map(s => {
+        const sum = sums[s.ticker] || {};
+        const spark = sum.spark?.length
+          ? window.tickerSummary.renderSparkSVG(sum.spark, 'BUY', 100, 24)
+          : '';
+        const ytd = window.tickerSummary?.renderYTD(sum.ytd_change) || '';
+        return `
+          <div class="sig-row">
+            <div class="sig-row-top">
+              <span class="sig-ticker">${escHtml(s.ticker)}</span>
+              <span class="sig-name">${escHtml(s.company_name || '')}</span>
+              <span class="sig-conf">${Math.round((s.confidence || 0) * 100)}%</span>
+            </div>
+            ${spark || ytd ? `<div class="sig-row-bottom">
+              <div class="sig-spark">${spark}</div>
+              <div class="sig-ytd">${ytd}</div>
+            </div>` : ''}
+          </div>`;
+      }).join('');
     } catch(e) {
       list.innerHTML = '<div class="sidebar-loading">Could not load signals</div>';
     }
@@ -697,5 +718,6 @@
 
 <script type="module" src="js/supabase-client.js"></script>
 <script src="js/auth.js"></script>
+<script src="js/ticker-summary.js"></script>
 </body>
 </html>

@@ -806,6 +806,8 @@
 
 <script>
   // ---- Demo signal data (replaced by Supabase when configured) ----
+  let summaries = {};
+
   const signals = [
     { t: 'KLVR',  n: 'Kelvr Semiconductors',  price: 118.42, ema: 116.05, chg: +2.04, mcap: 'Mega', rating: 'BUY'  },
     { t: 'MAVN',  n: 'Maven Energy',           price: 364.20, ema: 358.97, chg: +1.95, mcap: 'Mega', rating: 'BUY'  },
@@ -886,10 +888,12 @@
           </div>
         </div>
         <div class="sc-price mono">$${s.price.toFixed(2)}</div>
-        <div class="sc-chg mono${s.chg < 0 ? ' down' : ''}">
-          ${s.chg >= 0 ? '▲' : '▼'} ${Math.abs(s.chg).toFixed(2)}% · 1W
-        </div>
-        <div class="sc-chart">${renderSpark(i + 3)}</div>
+        <div class="sc-chg">${window.tickerSummary?.renderYTD(summaries[s.t]?.ytd_change) || ''}</div>
+        <div class="sc-chart">${
+          summaries[s.t]?.spark?.length
+            ? window.tickerSummary.renderSparkSVG(summaries[s.t].spark, s.rating || 'BUY', 210, 44)
+            : renderSpark(i + 3)
+        }</div>
         <div class="sc-ema">
           <div>
             <div class="sc-ema-label">Trend base</div>
@@ -1318,6 +1322,12 @@
       }));
       renderGrid();
 
+      // Fetch YTD + sparkline then re-render cards with real data
+      if (window.tickerSummary) {
+        summaries = await window.tickerSummary.getTickerSummaries(signals.map(s => s.t));
+        renderGrid();
+      }
+
       const buyEl = document.getElementById('statBuy');
       if (buyEl) buyEl.textContent = rows.length.toLocaleString();
     } catch(err) {
@@ -1381,6 +1391,7 @@
 <script type="module" src="js/supabase-client.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/chart-modal.js"></script>
+<script src="js/ticker-summary.js"></script>
 
 </body>
 </html>

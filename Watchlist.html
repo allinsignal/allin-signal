@@ -394,7 +394,12 @@
         <div class="right mono ${delta >= 0 ? 'delta-buy' : 'delta-sell'}">${delta >= 0 ? '+' : ''}${delta.toFixed(2)}%</div>
         <div class="right hide-sm">${isBuy ? '<span class="pill-buy">Buy</span>' : '<span class="pill-sell">Sell</span>'}</div>
         <div class="right mono hide-sm" style="color:var(--fg-1)">${Math.round(s.conf * 100)}%</div>
-        <div class="hide-sm wl-spark">${spark(idx + 7, s.rating)}</div>
+        <div class="hide-sm wl-spark">
+          ${wlSummaries[s.t]?.spark?.length
+            ? window.tickerSummary.renderSparkSVG(wlSummaries[s.t].spark, s.rating, 100, 32)
+            : spark(idx + 7, s.rating)}
+          <div style="text-align:center;margin-top:2px">${window.tickerSummary?.renderYTD(wlSummaries[s.t]?.ytd_change) || ''}</div>
+        </div>
         <div class="right hide-sm">
           ${s.alerts ? '<span style="color:var(--accent);font-size:11px">● on</span>' : '<span style="color:var(--fg-3);font-size:11px">○ off</span>'}
         </div>
@@ -459,6 +464,7 @@
   // ----- Supabase multi-watchlist integration -------------------------
   let allWatchlists = [];
   let activeWlId    = null;
+  let wlSummaries   = {};
 
   async function loadFromSupabase() {
     if (!window.allin?.isConfigured) return;
@@ -537,6 +543,11 @@
         added_on: new Date(r.added_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit' }),
       }));
       render();
+
+      if (window.tickerSummary && watchlist.length) {
+        wlSummaries = await window.tickerSummary.getTickerSummaries(watchlist.map(w => w.t));
+        render();
+      }
     }
   }
 
@@ -645,5 +656,6 @@
 <script type="module" src="js/supabase-client.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/chart-modal.js"></script>
+<script src="js/ticker-summary.js"></script>
 </body>
 </html>
