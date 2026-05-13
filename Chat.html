@@ -647,8 +647,8 @@
     try {
       const { data, error } = await window.allin.supabase
         .from('signals')
-        .select('ticker, name, confidence')
-        .eq('signal', 'BUY')
+        .select('ticker, company_name, confidence')
+        .eq('rating', 'BUY')
         .order('confidence', { ascending: false })
         .limit(30);
 
@@ -660,7 +660,7 @@
       list.innerHTML = data.map(s => `
         <div class="sig-row">
           <span class="sig-ticker">${escHtml(s.ticker)}</span>
-          <span class="sig-name">${escHtml(s.name || '')}</span>
+          <span class="sig-name">${escHtml(s.company_name || '')}</span>
           <span class="sig-conf">${Math.round((s.confidence || 0) * 100)}%</span>
         </div>`).join('');
     } catch(e) {
