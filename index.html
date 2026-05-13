@@ -1006,9 +1006,12 @@
     document.getElementById('dConf').textContent = s.conf > 0 ? Math.round(s.conf * 100) + '%' : (78 + (i % 9)) + '%';
 
     const v = document.getElementById('dVerdict');
-    v.classList.remove('sell');
-    document.getElementById('dVerdictTitle').textContent = `BUY · Allin Signal confirmed`;
-    document.getElementById('dVerdictSub').textContent = `Signal strength +${dist.toFixed(2)} — within the high-conviction zone.`;
+    const isSell = s.rating === 'SELL';
+    v.classList.toggle('sell', isSell);
+    document.getElementById('dVerdictTitle').textContent = isSell ? `SELL · Allin Signal confirmed` : `BUY · Allin Signal confirmed`;
+    document.getElementById('dVerdictSub').textContent = isSell
+      ? `Signal strength ${dist.toFixed(2)}% — below the trend baseline.`
+      : `Signal strength +${dist.toFixed(2)}% — within the high-conviction zone.`;
 
     const ok = '<svg class="ok" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg>';
     document.getElementById('dChecklist').innerHTML = [
