@@ -601,12 +601,13 @@
       sendBtn.addEventListener('click', sendMessage);
     }
 
-    // Load last 50 messages
+    // Load last 200 messages (keep all data in DB, cap UI display)
     const { data: history } = await window.allin.supabase
       .from('messages')
       .select('*')
-      .order('created_at', { ascending: true })
-      .limit(50);
+      .order('created_at', { ascending: false })
+      .limit(200)
+      .then(r => ({ ...r, data: r.data?.reverse() }));
 
     messagesArea.innerHTML = '';
     if (!history?.length) {
