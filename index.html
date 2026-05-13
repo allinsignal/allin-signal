@@ -881,7 +881,7 @@
       card.className = 'signal-card';
       card.dataset.idx = i;
       card.innerHTML = `
-        <div class="sc-rank mono">#${String(i + 1).padStart(2, '0')}</div>
+        <div class="sc-rank mono">#${String(i + 1).padStart(2, '0')} <span class="badge-top">BEST</span></div>
         <div class="sc-head">
           <div class="sc-logo" style="background:${hashColor(s.t)};color:var(--logo-fg)">${s.t.slice(0, 2)}</div>
           <div>
@@ -1340,7 +1340,7 @@
       row.style.cursor = 'pointer';
       const rankBadge = isTopPick ? '<span class="badge-top">BEST</span>' : '';
       row.innerHTML = `
-        <div class="mono lt-rank" style="${isTopPick ? '' : 'color:var(--fg-2)'}">#${String(11 + i).padStart(2, '0')}${rankBadge}</div>
+        <div class="mono lt-rank" style="${isTopPick ? '' : 'color:var(--fg-2)'}">#${String(1 + i).padStart(2, '0')}${rankBadge}</div>
         <div class="ticker">
           <div class="sc-logo" style="background:${hashColor(r.ticker)};color:var(--logo-fg)">${r.ticker.slice(0, 2)}</div>
           <div class="name-block"><b class="mono">${r.ticker}</b><span>${r.company_name || r.ticker}</span></div>
