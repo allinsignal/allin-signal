@@ -312,9 +312,10 @@
     lockedState.style.display = isMember ? 'none' : '';
     modeMember.classList.toggle('active', isMember);
     modeLocked.classList.toggle('active', !isMember);
+    if (isMember) document.querySelector('.mode-toggle').style.display = 'none';
   }
   modeLocked.addEventListener('click', () => setMode('locked'));
-  modeMember.addEventListener('click', () => setMode('member'));
+  modeMember.addEventListener('click', () => window.location.href = 'Pricing.html');
 
   // Demo watchlist
   const initialList = [
@@ -437,46 +438,86 @@
   // Supabase integration
   async function loadFromSupabase() {
     if (!window.allin?.isConfigured) return;
-    const user = await window.allin.currentUser();
-    if (!user) return;
+
+    const profile = await window.allin.currentProfile();
+    if (!profile?.is_subscribed) return; // stay on locked state
+
     setMode('member');
+
     const rows = await window.allin.getWatchlist();
-    watchlist = rows.map(r => ({
-      _id: r.id,
-      t: r.ticker,
-      n: r.signal?.company_name || r.ticker,
-      price: Number(r.signal?.price ?? r.added_price ?? 0),
-      added: Number(r.added_price ?? r.signal?.price ?? 0),
-      rating: r.signal?.rating || 'BUY',
-      conf: Number(r.signal?.confidence ?? 0.75),
-      alerts: !!r.alerts_enabled,
-      added_on: new Date(r.added_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit' }),
-    }));
-    render();
+
+    if (rows.length === 0) {
+      watchlist = [];
+      document.getElementById('wlBody').innerHTML = `
+        <div style="padding:48px 24px;text-align:center;color:var(--fg-2)">
+          <div style="font-size:15px;font-weight:600;color:var(--fg-1);margin-bottom:8px">Your watchlist is empty</div>
+          <div style="font-size:13px">Search a ticker above and press Add to start tracking it.</div>
+        </div>`;
+      document.getElementById('sumCount').textContent = '0';
+      document.getElementById('sumBuy').textContent   = '0';
+      document.getElementById('sumSell').textContent  = '0';
+      document.getElementById('sumAvg').textContent   = '+0.0%';
+    } else {
+      watchlist = rows.map(r => ({
+        _id:      r.id,
+        t:        r.ticker,
+        n:        r.signal?.company_name || r.ticker,
+        price:    Number(r.signal?.price    ?? r.added_price ?? 0),
+        added:    Number(r.added_price      ?? r.signal?.price ?? 0),
+        rating:   r.signal?.rating          || 'BUY',
+        conf:     Number(r.signal?.confidence ?? 0.75),
+        alerts:   !!r.alerts_enabled,
+        added_on: new Date(r.added_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit' }),
+      }));
+      render();
+    }
+
     document.getElementById('addBtn').onclick = addRealTicker;
     document.getElementById('wlSearch').onkeydown = e => { if (e.key === 'Enter') addRealTicker(); };
   }
+
   async function addRealTicker() {
     const inp = document.getElementById('wlSearch');
-    const t = (inp.value || '').trim().toUpperCase();
+    const btn = document.getElementById('addBtn');
+    const t   = (inp.value || '').trim().toUpperCase();
     if (!t) return;
+    const origHTML = btn.innerHTML;
+    btn.textContent = 'Adding…';
+    btn.disabled = true;
     try {
-      await window.allin.addToWatchlist(t);
-      inp.value = '';
-      await loadFromSupabase();
-    } catch(e) { alert(e.message || 'Could not add ticker'); }
+      const { error } = await window.allin.addToWatchlist(t);
+      if (error?.code === '23505') {
+        inp.value = '';
+        inp.placeholder = `${t} is already in your watchlist`;
+        setTimeout(() => { inp.placeholder = 'Search a ticker to add — AAPL, MSFT, NVDA…'; }, 2500);
+      } else if (error) {
+        inp.placeholder = `Could not add ${t} — check the ticker symbol`;
+        setTimeout(() => { inp.placeholder = 'Search a ticker to add — AAPL, MSFT, NVDA…'; }, 2500);
+      } else {
+        inp.value = '';
+        await loadFromSupabase();
+      }
+    } catch(e) {
+      inp.placeholder = 'Something went wrong — try again';
+      setTimeout(() => { inp.placeholder = 'Search a ticker to add — AAPL, MSFT, NVDA…'; }, 2500);
+    }
+    btn.innerHTML = origHTML;
+    btn.disabled = false;
   }
+
   document.getElementById('wlBody').addEventListener('click', async e => {
     const btn = e.target.closest('[data-remove]');
     if (!btn) return;
-    const i = parseInt(btn.dataset.remove);
+    const i   = parseInt(btn.dataset.remove);
     const row = watchlist[i];
-    if (row && row._id && window.allin?.isConfigured) {
+    if (row?._id && window.allin?.isConfigured) {
       e.stopImmediatePropagation();
+      btn.disabled = true;
       await window.allin.removeFromWatchlist(row._id);
       await loadFromSupabase();
     }
   }, true);
+
   window.addEventListener('allin:ready', loadFromSupabase);
 </script>
 
