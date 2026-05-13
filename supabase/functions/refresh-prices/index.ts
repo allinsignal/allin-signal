@@ -16,8 +16,8 @@ const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 function lastTradingDay(): string {
   const d = new Date();
   d.setUTCHours(0, 0, 0, 0);
-  d.setUTCDate(d.getUTCDate() - 1);
-  // Roll back over weekends
+  // Don't subtract a day — run at 9 PM+ UTC when today's market is already closed.
+  // Roll back over weekends so Monday uses Friday's date.
   while (d.getUTCDay() === 0 || d.getUTCDay() === 6) {
     d.setUTCDate(d.getUTCDate() - 1);
   }
