@@ -283,26 +283,40 @@
   .paywall-cta:hover { filter: brightness(1.06); }
   .paywall-fine { font-size: 11px; color: var(--fg-3); margin-top: 10px; }
 
-  /* search teaser bar */
-  .search-locked {
-    margin: 18px 32px 0;
-    padding: 14px 18px;
+  /* search bar */
+  .search-bar {
+    margin: 0 32px 20px;
+    display: flex; align-items: center; gap: 12px;
+    padding: 13px 18px;
     background: var(--bg-1);
     border: 1px solid var(--line-soft);
     border-radius: 10px;
-    display: flex; align-items: center; gap: 12px;
   }
-  .search-locked .icon { color: var(--fg-2); flex: none; }
-  .search-locked input {
-    flex: 1; background: transparent; border: 0; color: var(--fg-2);
-    font-family: inherit; font-size: 14px; outline: none; cursor: pointer;
+  .search-bar:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
   }
-  .search-locked .lock-tag {
+  .search-bar .icon { color: var(--fg-2); flex: none; }
+  .search-bar input {
+    flex: 1; background: transparent; border: 0; color: var(--fg-0);
+    font-family: inherit; font-size: 14px; outline: none;
+  }
+  .search-bar input::placeholder { color: var(--fg-2); }
+  .search-bar input[readonly] { cursor: pointer; color: var(--fg-2); }
+  .search-bar .lock-tag {
     display: inline-flex; align-items: center; gap: 6px;
     font-size: 11px; color: var(--accent);
     padding: 4px 9px; border-radius: 6px;
-    background: var(--accent-soft); border: 1px solid var(--accent-soft);
-    white-space: nowrap;
+    background: var(--accent-soft);
+    white-space: nowrap; flex: none;
+  }
+  .search-bar .search-btn {
+    padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 600;
+    background: var(--accent); color: var(--logo-fg); flex: none;
+    display: none;
+  }
+  .search-bar.unlocked .search-btn { display: block; }
+  .search-bar.unlocked input { color: var(--fg-0); cursor: text; }
   }
 
   /* footer */
@@ -463,7 +477,7 @@
     .signal-grid { padding: 0 20px 12px; }
     .locked-wrap { padding: 12px 20px 32px; }
     .strip { padding: 12px 20px; }
-    .search-locked { margin: 18px 20px 0; }
+    .search-bar { margin: 0 20px 16px; }
     footer { padding: 32px 20px 40px; }
   }
   @media (max-width: 500px) {
@@ -554,6 +568,17 @@
   </div>
 </div>
 
+<!-- Search bar -->
+<div class="search-bar" id="searchBar">
+  <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+  <input placeholder="Search any ticker — AAPL, MSFT, NVDA, BRK.B…" id="lockedSearch" readonly autocomplete="off" />
+  <span class="lock-tag">
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>
+    Members only
+  </span>
+  <button class="search-btn" id="searchBtn">Search</button>
+</div>
+
 <!-- Section: Top 10 -->
 <div class="section-head">
   <div>
@@ -569,16 +594,6 @@
 </div>
 
 <div class="signal-grid" id="signalGrid"></div>
-
-<!-- Locked search -->
-<div class="search-locked">
-  <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-  <input placeholder="Search any ticker — AAPL, MSFT, NVDA, BRK.B…" id="lockedSearch" readonly />
-  <span class="lock-tag">
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>
-    Members only
-  </span>
-</div>
 
 <!-- Section: locked rest -->
 <div class="section-head">
@@ -1063,7 +1078,9 @@
 
   document.getElementById('topUpgrade').addEventListener('click', goToPricing);
   document.getElementById('paywallCta').addEventListener('click', goToPricing);
-  document.getElementById('lockedSearch').addEventListener('click', goToPricing);
+  document.getElementById('searchBar').addEventListener('click', e => {
+    if (!document.getElementById('searchBar').classList.contains('unlocked')) goToPricing();
+  });
   document.getElementById('modalClose').addEventListener('click', closeModal);
   mScrim.addEventListener('click', e => { if (e.target === mScrim) closeModal(); });
 
@@ -1168,23 +1185,27 @@
       topUpgradeBtn.parentNode.replaceChild(badge, topUpgradeBtn);
     }
 
-    // Clone the search input to strip the Stripe click handler, then re-wire
-    const oldInput = document.getElementById('lockedSearch');
-    if (oldInput) {
-      const searchWrap = oldInput.closest('.search-locked');
+    // Unlock search bar
+    const searchBar = document.getElementById('searchBar');
+    const oldInput  = document.getElementById('lockedSearch');
+    if (oldInput && searchBar) {
+      // Clone to strip the Pricing redirect click handler
       const newInput = oldInput.cloneNode(true);
       oldInput.parentNode.replaceChild(newInput, oldInput);
       newInput.removeAttribute('readonly');
-      newInput.style.cursor = 'text';
+      searchBar.classList.add('unlocked');
+      searchBar.querySelector('.lock-tag')?.remove();
 
-      const lockTag = searchWrap?.querySelector('.lock-tag');
-      if (lockTag) lockTag.style.display = 'none';
-
-      newInput.addEventListener('keydown', async (e) => {
-        if (e.key !== 'Enter') return;
+      async function doSearch() {
         const ticker = newInput.value.trim().toUpperCase();
         if (!ticker) return;
+        const btn = document.getElementById('searchBtn');
+        const orig = btn.textContent;
+        btn.textContent = '…';
+        btn.disabled = true;
         const sig = await window.allin.searchSignal(ticker);
+        btn.textContent = orig;
+        btn.disabled = false;
         if (sig) {
           const s = {
             t: sig.ticker, n: sig.company_name || sig.ticker,
@@ -1194,10 +1215,13 @@
           openDrawer(s, 0);
         } else {
           newInput.value = '';
-          newInput.placeholder = `"${ticker}" not found — try another`;
-          setTimeout(() => { newInput.placeholder = 'Search any ticker — AAPL, MSFT, NVDA, BRK.B…'; }, 2500);
+          newInput.placeholder = `"${ticker}" not found — check the symbol and try again`;
+          setTimeout(() => { newInput.placeholder = 'Search any ticker — AAPL, MSFT, NVDA, BRK.B…'; }, 3000);
         }
-      });
+      }
+
+      newInput.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+      document.getElementById('searchBtn').addEventListener('click', doSearch);
     }
   }
 
