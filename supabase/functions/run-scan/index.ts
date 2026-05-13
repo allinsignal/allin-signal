@@ -16,41 +16,53 @@ const SB_SERVICE  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const supabase    = createClient(SB_URL, SB_SERVICE);
 
 // ---------- CONFIG ---------------------------------------------------
-const SMA_WEEKS = 200;                      // 200-week SMA
-const HISTORY_DAYS = SMA_WEEKS * 5 + 50;    // trading days needed (~1050)
+const SMA_WEEKS  = 200;                     // 200-week SMA
+const SMA_DAYS   = SMA_WEEKS * 5;           // ~1000 trading days
+const LOOKBACK_DAYS = 4 * 252;              // 4-year confidence window (~1008 days)
+const HISTORY_DAYS = SMA_DAYS + LOOKBACK_DAYS + 50; // ~2058 days needed
 const MARKET_CAP_MIN = 10_000_000_000;      // $10B
 const MARKET_CAP_MAX = 200_000_000_000;     // $200B
 const MAX_DISTANCE_ABOVE_SMA = 0.10;        // 0–10% above SMA = BUY zone
 
 // ====== ALLIN MODEL ===================================================
-// Buy zone: market cap $10B–$200B AND price is 0% to 10% above 200-week SMA.
-// Confidence = how close to the SMA (closer = higher confidence).
+// Buy zone: price is 0–10% above its 200-week SMA.
+// Confidence = fraction of the last 4 years the stock spent ABOVE its
+// 200-week SMA (sliding window). Stocks that rarely dip below their
+// long-term trend score highest.
 function rate(closes: number[], marketCap: number) {
-  // Cap filter
   if (marketCap < MARKET_CAP_MIN || marketCap > MARKET_CAP_MAX) return null;
+  if (closes.length < SMA_DAYS + 1) return null;
 
-  // Need enough history for SMA(200) on weekly bars
-  if (closes.length < SMA_WEEKS * 5) return null;
-
-  // Build weekly closes: last trading day of each ISO-week, oldest → newest.
-  // closes are daily; we sample every 5 trading days from the end backwards.
-  const weeklyCloses: number[] = [];
-  for (let i = closes.length - 1; i >= 0 && weeklyCloses.length < SMA_WEEKS; i -= 5) {
-    weeklyCloses.unshift(closes[i]);
-  }
-  if (weeklyCloses.length < SMA_WEEKS) return null;
-
-  const sma = weeklyCloses.reduce((a, b) => a + b, 0) / weeklyCloses.length;
+  // Current 200-week SMA and price
+  const recentSmaWindow = closes.slice(-SMA_DAYS);
+  const sma = recentSmaWindow.reduce((a, b) => a + b, 0) / SMA_DAYS;
   const price = closes[closes.length - 1];
-  const distance = (price - sma) / sma;   // positive = price above SMA
+  const distance = (price - sma) / sma;
 
-  // In buy zone: 0 ≤ distance ≤ 10%
-  if (distance >= 0 && distance <= MAX_DISTANCE_ABOVE_SMA) {
-    // Closer to SMA = higher confidence. distance=0 → 1.0, distance=10% → 0.5
-    const confidence = 1 - (distance / MAX_DISTANCE_ABOVE_SMA) * 0.5;
-    return { rating: "BUY", confidence, trend_base: sma };
+  const rating = distance >= 0 && distance <= MAX_DISTANCE_ABOVE_SMA ? "BUY" : "SELL";
+
+  // Confidence: % of days in 4-year lookback where price > rolling 200-week SMA.
+  // Uses a sliding window sum for O(n) performance.
+  const lookback = Math.min(LOOKBACK_DAYS, closes.length - SMA_DAYS);
+  const startIdx = closes.length - SMA_DAYS - lookback;
+
+  let windowSum = 0;
+  for (let j = startIdx; j < startIdx + SMA_DAYS; j++) windowSum += closes[j];
+
+  let daysAbove = 0;
+  for (let i = 0; i < lookback; i++) {
+    const priceIdx = startIdx + SMA_DAYS + i;
+    if (closes[priceIdx] > windowSum / SMA_DAYS) daysAbove++;
+    // Slide: drop oldest bar, add the bar that just entered the SMA window
+    if (i < lookback - 1) {
+      windowSum -= closes[startIdx + i];
+      windowSum += closes[priceIdx];
+    }
   }
-  return { rating: "SELL", confidence: 0.6, trend_base: sma };
+
+  const confidence = Math.round((daysAbove / lookback) * 1000) / 1000;
+
+  return { rating, confidence, trend_base: sma };
 }
 // =====================================================================
 
