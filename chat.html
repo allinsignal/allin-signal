@@ -289,6 +289,31 @@
     .nav a:not(.active) { display: none; }
     .chat-input-bar { padding: 10px 14px; }
   }
+
+  /* ---- Emoji reactions ---- */
+  .msg-reactions { display:flex; flex-wrap:wrap; gap:4px; margin-top:5px; min-height:0; }
+  .reaction-pill {
+    display:inline-flex; align-items:center; gap:4px; padding:2px 8px;
+    border-radius:12px; font-size:13px; cursor:pointer; user-select:none;
+    background:var(--bg-2); border:1px solid var(--line-soft); transition:background 0.1s;
+  }
+  .reaction-pill:hover { background:var(--bg-3); border-color:var(--line); }
+  .reaction-pill.mine { background:var(--accent-soft); border-color:var(--accent); }
+  .reaction-pill .r-count { font-size:11px; font-weight:600; font-family:'JetBrains Mono',monospace; color:var(--fg-1); }
+  .react-btn {
+    opacity:0; transition:opacity 0.12s; margin-top:4px;
+    font-size:12px; padding:1px 7px; border-radius:6px;
+    border:1px solid var(--line-soft); color:var(--fg-2); background:var(--bg-2); cursor:pointer;
+  }
+  .msg:hover .react-btn { opacity:1; }
+  #emojiPicker {
+    position:fixed; z-index:400; display:none; gap:2px; padding:6px;
+    border-radius:10px; background:var(--bg-1); border:1px solid var(--line);
+    box-shadow:0 8px 24px oklch(0 0 0/0.35);
+  }
+  #emojiPicker.open { display:flex; }
+  .e-opt { font-size:20px; cursor:pointer; padding:4px 6px; border-radius:6px; line-height:1; }
+  .e-opt:hover { background:var(--bg-3); }
 </style>
 </head>
 <body>
@@ -407,6 +432,45 @@
   let isBanned       = false;
   let realtimeChannel = null;
   let lastDateLabel  = null;
+  const reactionsMap = {}; // { [msgId]: { [emoji]: { count, mine } } }
+  let pickerMsgId    = null;
+
+  // ---- Reaction helpers ----
+  function addToMap(r) {
+    if (!reactionsMap[r.message_id]) reactionsMap[r.message_id] = {};
+    if (!reactionsMap[r.message_id][r.emoji]) reactionsMap[r.message_id][r.emoji] = { count: 0, mine: false };
+    reactionsMap[r.message_id][r.emoji].count++;
+    if (r.user_id === currentUser?.id) reactionsMap[r.message_id][r.emoji].mine = true;
+  }
+  function removeFromMap(r) {
+    if (!reactionsMap[r.message_id]?.[r.emoji]) return;
+    reactionsMap[r.message_id][r.emoji].count = Math.max(0, reactionsMap[r.message_id][r.emoji].count - 1);
+    if (r.user_id === currentUser?.id) reactionsMap[r.message_id][r.emoji].mine = false;
+    if (reactionsMap[r.message_id][r.emoji].count === 0) delete reactionsMap[r.message_id][r.emoji];
+  }
+  function renderReactions(msgId) {
+    const el = document.getElementById('rxn-' + msgId);
+    if (!el) return;
+    const rxns = reactionsMap[msgId] || {};
+    el.innerHTML = Object.entries(rxns)
+      .filter(([, v]) => v.count > 0)
+      .map(([emoji, v]) =>
+        `<span class="reaction-pill${v.mine ? ' mine' : ''}" data-msgid="${msgId}" data-emoji="${emoji}">
+          ${emoji}<span class="r-count">${v.count}</span>
+        </span>`)
+      .join('');
+  }
+  async function toggleReaction(msgId, emoji) {
+    if (!currentUser) return;
+    const mine = reactionsMap[msgId]?.[emoji]?.mine;
+    if (mine) {
+      await window.allin.supabase.from('message_reactions')
+        .delete().eq('message_id', msgId).eq('user_id', currentUser.id).eq('emoji', emoji);
+    } else {
+      await window.allin.supabase.from('message_reactions')
+        .insert({ message_id: msgId, user_id: currentUser.id, emoji });
+    }
+  }
 
   // ---- Build message DOM ----
   function buildMessage(msg) {
@@ -436,6 +500,8 @@
           <span class="msg-time">${fmtTime(msg.created_at)}</span>
         </div>
         <div class="msg-text">${escHtml(msg.content)}</div>
+        <div class="msg-reactions" id="rxn-${msg.id}"></div>
+        <button class="react-btn" data-msgid="${msg.id}">☺ React</button>
         ${isMod && !isOwn ? `
           <div class="msg-actions">
             <button class="msg-action-btn" data-action="delete" data-id="${msg.id}" title="Delete message">Delete</button>
@@ -534,7 +600,39 @@
     } else {
       history.forEach(m => appendMessage(m, false));
       messagesArea.scrollTop = messagesArea.scrollHeight;
+
+      // Load reactions for visible messages
+      const msgIds = history.map(m => m.id);
+      const { data: rxns } = await window.allin.supabase
+        .from('message_reactions').select('*').in('message_id', msgIds);
+      if (rxns) { rxns.forEach(r => addToMap(r)); msgIds.forEach(id => renderReactions(id)); }
     }
+
+    // Emoji picker
+    const picker = document.getElementById('emojiPicker');
+    messagesArea.addEventListener('click', e => {
+      const reactBtn = e.target.closest('.react-btn');
+      if (reactBtn) {
+        pickerMsgId = reactBtn.dataset.msgid;
+        const rect = reactBtn.getBoundingClientRect();
+        picker.style.left = Math.min(rect.left, window.innerWidth - 230) + 'px';
+        picker.style.top  = (rect.top - 52) + 'px';
+        picker.classList.add('open');
+        e.stopPropagation();
+        return;
+      }
+      const pill = e.target.closest('.reaction-pill');
+      if (pill) { toggleReaction(pill.dataset.msgid, pill.dataset.emoji); return; }
+    });
+    picker.addEventListener('click', e => {
+      const opt = e.target.closest('.e-opt');
+      if (opt && pickerMsgId) {
+        toggleReaction(pickerMsgId, opt.dataset.emoji);
+        picker.classList.remove('open');
+        pickerMsgId = null;
+      }
+    });
+    document.addEventListener('click', () => { picker.classList.remove('open'); pickerMsgId = null; });
 
     // Mod actions (delete + ban)
     messagesArea.addEventListener('click', async e => {
@@ -572,9 +670,17 @@
 
     // Subscribe to realtime
     realtimeChannel = window.allin.supabase
-      .channel('public:messages')
+      .channel('public:chat')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
         appendMessage(payload.new);
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'message_reactions' }, payload => {
+        addToMap(payload.new);
+        renderReactions(payload.new.message_id);
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'message_reactions' }, payload => {
+        removeFromMap(payload.old);
+        renderReactions(payload.old.message_id);
       })
       .subscribe();
   }
@@ -762,6 +868,15 @@
     upgradeBtn.onclick = null;
   });
 </script>
+
+<div id="emojiPicker">
+  <span class="e-opt" data-emoji="👍">👍</span>
+  <span class="e-opt" data-emoji="❤️">❤️</span>
+  <span class="e-opt" data-emoji="🔥">🔥</span>
+  <span class="e-opt" data-emoji="🚀">🚀</span>
+  <span class="e-opt" data-emoji="😂">😂</span>
+  <span class="e-opt" data-emoji="💯">💯</span>
+</div>
 
 <script type="module" src="js/supabase-client.js"></script>
 <script src="js/auth.js"></script>
