@@ -35,25 +35,34 @@ async function fetchAllTickers() {
   return all;
 }
 
-// Polygon's /v3/reference/tickers doesn't return market_cap directly —
-// we need /v3/reference/tickers/{ticker} per ticker for that. Too slow
-// on free tier for 7000 tickers. Workaround: use the snapshot endpoint
-// which returns market data for all tickers in one call, then enrich
-// with /vX/reference/tickers/{ticker} only for tickers passing a
-// price-based filter later. For now we store name + exchange only,
-// and let the scan use a snapshot-style market cap (price * shares).
-async function fetchTickerDetails(symbol: string) {
-  const url = `https://api.polygon.io/v3/reference/tickers/${symbol}?apiKey=${POLYGON_KEY}`;
-  const res = await fetch(url);
-  if (!res.ok) return null;
-  const json = await res.json();
-  return json.results;
+// Batch-fetch market caps using ticker.any_of (up to 100 per call).
+// Polygon's list endpoint returns market_cap per result when you filter
+// by specific tickers. 100 tickers/call × 13 s gap = ~11 min for 5000 tickers.
+async function fetchMarketCaps(tickers: string[]): Promise<Map<string, number>> {
+  const caps = new Map<string, number>();
+  const BATCH = 100;
+  for (let i = 0; i < tickers.length; i += BATCH) {
+    const batch = tickers.slice(i, i + BATCH);
+    const url = `https://api.polygon.io/v3/reference/tickers?ticker.any_of=${batch.join(',')}&limit=100&apiKey=${POLYGON_KEY}`;
+    try {
+      const res = await fetch(url);
+      if (res.status === 429) { await sleep(15000); i -= BATCH; continue; }
+      if (!res.ok) continue;
+      const json = await res.json();
+      for (const r of (json.results || [])) {
+        if (r.market_cap) caps.set(r.ticker, r.market_cap);
+      }
+    } catch (_) {}
+    if (i + BATCH < tickers.length) await sleep(13000);
+  }
+  return caps;
 }
 
 Deno.serve(async (req) => {
   try {
     const url = new URL(req.url);
-    const enrich = url.searchParams.get("enrich") === "true";
+    // Pass ?enrich=false to do a fast name-only refresh (skips market cap fetch)
+    const enrich = url.searchParams.get("enrich") !== "false";
 
     const tickers = await fetchAllTickers();
     console.log(`Fetched ${tickers.length} tickers`);
@@ -69,24 +78,26 @@ Deno.serve(async (req) => {
     for (let i = 0; i < rows.length; i += 1000) {
       await supabase.from("tickers").upsert(rows.slice(i, i + 1000));
     }
+    console.log(`Upserted ${rows.length} tickers`);
 
-    // Optional second pass: enrich with market_cap.
-    // Only call with ?enrich=true if you've upgraded Polygon — this is
-    // 7000 calls × 12s = 24h on free tier. On Starter it's ~5 min.
-    if (enrich) {
-      for (const t of tickers) {
-        const details = await fetchTickerDetails(t.ticker);
-        if (details?.market_cap) {
-          await supabase.from("tickers")
-            .update({ market_cap: details.market_cap })
-            .eq("ticker", t.ticker);
-        }
-        await sleep(13000);
+    // Batch-fetch market caps (100 tickers per call, respects free-tier rate limits).
+    // Skip with ?enrich=false to do a fast name-only refresh.
+    if (enrich !== false) {
+      const symbols = tickers.map(t => t.ticker);
+      console.log(`Fetching market caps for ${symbols.length} tickers…`);
+      const caps = await fetchMarketCaps(symbols);
+      console.log(`Got market caps for ${caps.size} tickers`);
+
+      const capRows = Array.from(caps.entries()).map(([ticker, market_cap]) => ({
+        ticker, market_cap, last_updated: new Date().toISOString(),
+      }));
+      for (let i = 0; i < capRows.length; i += 1000) {
+        await supabase.from("tickers").upsert(capRows.slice(i, i + 1000), { onConflict: 'ticker' });
       }
     }
 
     return new Response(JSON.stringify({
-      ok: true, tickers: rows.length, enriched: enrich,
+      ok: true, tickers: rows.length,
     }), { headers: { "Content-Type": "application/json" } });
   } catch (e) {
     return new Response(JSON.stringify({ error: String(e) }), {

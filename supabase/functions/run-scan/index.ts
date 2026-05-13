@@ -20,8 +20,7 @@ const SMA_WEEKS  = 200;                     // 200-week SMA
 const SMA_DAYS   = SMA_WEEKS * 5;           // ~1000 trading days
 const LOOKBACK_DAYS = 4 * 252;              // 4-year confidence window (~1008 days)
 const HISTORY_DAYS = SMA_DAYS + LOOKBACK_DAYS + 50; // ~2058 days needed
-const MARKET_CAP_MIN = 10_000_000_000;      // $10B
-const MARKET_CAP_MAX = 200_000_000_000;     // $200B
+const MARKET_CAP_MIN = 10_000_000_000;      // $10B — large cap floor (no upper limit)
 const MAX_DISTANCE_ABOVE_SMA = 0.10;        // 0–10% above SMA = BUY zone
 
 // ====== ALLIN MODEL ===================================================
@@ -30,7 +29,7 @@ const MAX_DISTANCE_ABOVE_SMA = 0.10;        // 0–10% above SMA = BUY zone
 // 200-week SMA (sliding window). Stocks that rarely dip below their
 // long-term trend score highest.
 function rate(closes: number[], marketCap: number) {
-  if (marketCap < MARKET_CAP_MIN || marketCap > MARKET_CAP_MAX) return null;
+  if (marketCap < MARKET_CAP_MIN) return null;  // exclude small/mid cap
   if (closes.length < SMA_DAYS + 1) return null;
 
   // Current 200-week SMA and price
