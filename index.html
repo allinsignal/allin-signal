@@ -553,7 +553,7 @@
 <!-- Hero -->
 <section class="hero">
   <div>
-    <h1>Scanning <em>9,412</em> tickers through the Allin Signal model, every close.</h1>
+    <h1>Scanning <em id="tickerCount">—</em> tickers through the Allin Signal model, every close.</h1>
     <p>Allin Signal runs every US-listed stock through our proprietary trend model and flags it as a buy or a sell. No noise, no narratives — just one rating, refreshed at the close.</p>
   </div>
   <div class="hero-stats">
@@ -1352,6 +1352,14 @@
   // ---- Supabase: load real data and check membership ----
   window.addEventListener('allin:ready', async () => {
     if (!window.allin?.isConfigured) return;
+
+    // Live ticker universe count
+    window.allin.supabase
+      .from('tickers').select('*', { count: 'exact', head: true }).eq('active', true)
+      .then(({ count }) => {
+        if (count) document.getElementById('tickerCount').textContent = count.toLocaleString();
+      });
+
     try {
       const rows = await window.allin.topSignals(10);
       if (!rows || !rows.length) return;
