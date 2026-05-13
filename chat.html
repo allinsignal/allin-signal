@@ -149,6 +149,18 @@
   .sidebar-loading {
     padding: 20px 16px; font-size: 12px; color: var(--fg-3); text-align: center;
   }
+  .sidebar-search {
+    padding: 8px 12px; border-bottom: 1px solid var(--line-soft);
+  }
+  .sidebar-search input {
+    width: 100%; padding: 6px 10px; border-radius: 6px; font-size: 12px;
+    background: var(--bg-2); border: 1px solid var(--line-soft); color: var(--fg-0);
+    font-family: inherit; outline: none;
+  }
+  .sidebar-search input:focus { border-color: var(--accent); }
+  .sidebar-search input::placeholder { color: var(--fg-3); }
+  .sig-ticker { cursor: pointer; color: var(--accent); }
+  .sig-ticker:hover { text-decoration: underline; }
 
   @media (max-width: 860px) {
     .signals-sidebar { display: none; }
@@ -338,6 +350,9 @@
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
       Buy Signals
       <a href="index.html">View all →</a>
+    </div>
+    <div class="sidebar-search">
+      <input type="search" id="sidebarSearch" placeholder="Search ticker or name…" autocomplete="off" />
     </div>
     <div class="sidebar-list" id="sidebarList">
       <div class="sidebar-loading">Loading signals…</div>
@@ -706,6 +721,15 @@
           input.value = (input.value + ' $' + row.dataset.ticker + ' ').trimStart();
           input.focus();
         }
+      });
+
+      document.getElementById('sidebarSearch').addEventListener('input', e => {
+        const q = e.target.value.trim().toLowerCase();
+        list.querySelectorAll('.sig-row').forEach(row => {
+          const ticker = (row.dataset.ticker || '').toLowerCase();
+          const name   = (row.dataset.name   || '').toLowerCase();
+          row.style.display = (!q || ticker.includes(q) || name.includes(q)) ? '' : 'none';
+        });
       });
     } catch(e) {
       list.innerHTML = '<div class="sidebar-loading">Could not load signals</div>';
