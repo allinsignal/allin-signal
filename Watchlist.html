@@ -429,9 +429,8 @@
   document.getElementById('addBtn').addEventListener('click', addTicker);
   document.getElementById('wlSearch').addEventListener('keydown', e => { if (e.key === 'Enter') addTicker(); });
 
-  const STRIPE_URL = 'https://buy.stripe.com/3cIdR96g9eZJbF4cpvcZa00';
-  document.getElementById('lockedSubscribe').addEventListener('click', () => { window.open(STRIPE_URL, '_blank'); });
-  document.getElementById('topUpgrade').addEventListener('click', () => { window.open(STRIPE_URL, '_blank'); });
+  document.getElementById('lockedSubscribe').addEventListener('click', () => { window.location.href = 'Pricing.html'; });
+  document.getElementById('topUpgrade').addEventListener('click', () => { window.location.href = 'Pricing.html'; });
 
   render();
 

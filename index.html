@@ -684,7 +684,7 @@
       <svg width="14" height="14" style="vertical-align:-2px; margin-right:6px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0112 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 004 0"/></svg>
       Set alert
     </button>
-    <button class="upgrade-btn" id="drawerUpgrade">Unlock full data</button>
+    <button class="upgrade-btn" id="watchlistBtn">+ Add to Watchlist</button>
   </div>
 </aside>
 
@@ -868,8 +868,10 @@
   // ---- Drawer ----
   const scrim  = document.getElementById('drawerScrim');
   const drawer = document.getElementById('drawer');
+  let currentSignal = null;
 
   function openDrawer(s, i) {
+    currentSignal = s;
     const logo = document.getElementById('dLogo');
     logo.textContent = s.t.slice(0, 2);
     logo.style.background = hashColor(s.t);
@@ -935,21 +937,44 @@
 
   document.getElementById('drawerClose').addEventListener('click', closeDrawer);
   scrim.addEventListener('click', closeDrawer);
-  document.getElementById('drawerUpgrade').addEventListener('click', () => { closeDrawer(); openModal(); });
   document.getElementById('alertBtn').addEventListener('click', () => {
-    if (!window.allin?.isConfigured) { closeDrawer(); openModal(); }
-    // else: wire real alert subscription
+    if (!window.allin?.isConfigured) { closeDrawer(); goToPricing(); }
   });
 
-  // ---- Modal ----
-  const STRIPE_URL = 'https://buy.stripe.com/3cIdR96g9eZJbF4cpvcZa00';
+  // ---- Watchlist button ----
+  document.getElementById('watchlistBtn').addEventListener('click', async () => {
+    if (!currentSignal) return;
+    const profile = await window.allin?.currentProfile();
+    if (!profile?.is_subscribed) { closeDrawer(); goToPricing(); return; }
+
+    const btn = document.getElementById('watchlistBtn');
+    btn.textContent = 'Adding…';
+    btn.disabled = true;
+    try {
+      const { error } = await window.allin.addToWatchlist(currentSignal.t);
+      if (error?.code === '23505') {
+        btn.textContent = '✓ Already in watchlist';
+      } else if (error) {
+        btn.textContent = 'Error — try again';
+        btn.disabled = false;
+      } else {
+        btn.textContent = '✓ Added!';
+      }
+    } catch(e) {
+      btn.textContent = 'Error — try again';
+      btn.disabled = false;
+    }
+    setTimeout(() => { btn.textContent = '+ Add to Watchlist'; btn.disabled = false; }, 2500);
+  });
+
+  // ---- Paywall: all CTAs go to Pricing page first ----
   const mScrim = document.getElementById('modalScrim');
-  function openModal() { window.open(STRIPE_URL, '_blank'); }
+  function goToPricing() { window.location.href = 'Pricing.html'; }
   function closeModal() { mScrim.classList.remove('open'); }
 
-  document.getElementById('topUpgrade').addEventListener('click', openModal);
-  document.getElementById('paywallCta').addEventListener('click', openModal);
-  document.getElementById('lockedSearch').addEventListener('click', openModal);
+  document.getElementById('topUpgrade').addEventListener('click', goToPricing);
+  document.getElementById('paywallCta').addEventListener('click', goToPricing);
+  document.getElementById('lockedSearch').addEventListener('click', goToPricing);
   document.getElementById('modalClose').addEventListener('click', closeModal);
   mScrim.addEventListener('click', e => { if (e.target === mScrim) closeModal(); });
 
@@ -1043,13 +1068,15 @@
     const pw = document.querySelector('.paywall');
     if (pw) pw.style.display = 'none';
 
-    // Hide topbar subscribe button, show member badge
+    // Replace topbar subscribe button with member badge (strips event listeners)
     const topUpgradeBtn = document.getElementById('topUpgrade');
     if (topUpgradeBtn) {
-      topUpgradeBtn.textContent = '✓ Member';
-      topUpgradeBtn.style.background = 'var(--accent-soft)';
-      topUpgradeBtn.style.color = 'var(--accent)';
-      topUpgradeBtn.onclick = null;
+      const badge = topUpgradeBtn.cloneNode(true);
+      badge.textContent = '✓ Member';
+      badge.style.background = 'var(--accent-soft)';
+      badge.style.color = 'var(--accent)';
+      badge.style.cursor = 'default';
+      topUpgradeBtn.parentNode.replaceChild(badge, topUpgradeBtn);
     }
 
     // Clone the search input to strip the Stripe click handler, then re-wire
