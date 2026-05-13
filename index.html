@@ -656,9 +656,9 @@
       <div class="right">PRICE</div>
       <div class="right">TREND BASE</div>
       <div class="right hide-sm">STRENGTH</div>
-      <div class="right hide-sm">WK CHG</div>
+      <div class="right hide-sm">YTD</div>
       <div class="hide-sm">SIGNAL</div>
-      <div class="right hide-sm">CONFIDENCE</div>
+      <div class="hide-sm">TREND</div>
     </div>
     <!-- rows injected by JS -->
   </div>
@@ -1308,9 +1308,9 @@
     }
   }
 
-  async function loadMemberTable(rows) {
+  async function loadMemberTable(rows, sums) {
+    sums = sums || {};
     const tbl = document.getElementById('lockedTable');
-    // Clear placeholder rows (keep header)
     const head = tbl.querySelector('.lt-head');
     tbl.innerHTML = '';
     if (head) tbl.appendChild(head);
@@ -1318,7 +1318,14 @@
       const p = Number(r.price), e = Number(r.trend_base ?? r.price);
       const distRaw = e > 0 ? (p - e) / e * 100 : 0;
       const isBuy = r.rating === 'BUY';
-      const conf = Number(r.confidence ?? 0);
+      const sum = sums[r.ticker] || {};
+      const ytdPct = sum.ytd_change;
+      const ytdHtml = ytdPct != null
+        ? `<span class="${ytdPct >= 0 ? 'delta-buy' : 'delta-sell'}">${ytdPct >= 0 ? '+' : ''}${Number(ytdPct).toFixed(1)}%</span>`
+        : '<span style="color:var(--fg-3)">—</span>';
+      const sparkHtml = sum.spark?.length
+        ? (window.tickerSummary?.renderSparkSVG(sum.spark, r.rating || 'BUY', 80, 24) || '')
+        : '';
       const row = document.createElement('div');
       row.className = 'lt-row';
       row.style.cursor = 'pointer';
@@ -1331,10 +1338,10 @@
         <div class="right mono">$${p.toFixed(2)}</div>
         <div class="right mono" style="color:var(--fg-1)">$${e.toFixed(2)}</div>
         <div class="right mono hide-sm ${isBuy ? 'delta-buy' : 'delta-sell'}">${distRaw >= 0 ? '+' : ''}${distRaw.toFixed(2)}%</div>
-        <div class="right mono hide-sm ${isBuy ? 'delta-buy' : 'delta-sell'}">—</div>
+        <div class="right mono hide-sm">${ytdHtml}</div>
         <div class="hide-sm">${isBuy ? '<span class="pill-buy">Buy</span>' : '<span class="pill-sell">Sell</span>'}</div>
-        <div class="hide-sm"><div class="lt-bar"><div class="lt-bar-fill${isBuy ? '' : ' sell'}" style="width:${Math.round(conf * 100)}%"></div></div></div>`;
-      const s = { t: r.ticker, n: r.company_name || r.ticker, price: p, ema: e, chg: 0, mcap: 'Mid' };
+        <div class="hide-sm" style="display:flex;align-items:center">${sparkHtml}</div>`;
+      const s = { t: r.ticker, n: r.company_name || r.ticker, price: p, ema: e, chg: 0, conf: Number(r.confidence ?? 0), mcap: 'Mid', rating: r.rating || 'BUY' };
       row.addEventListener('click', () => openDrawer(s, 11 + i));
       tbl.appendChild(row);
     });
@@ -1380,7 +1387,13 @@
       if (profile?.is_subscribed) {
         unlockMember();
         const memberRows = await window.allin.allSignals(200);
-        if (memberRows?.length) loadMemberTable(memberRows);
+        if (memberRows?.length) {
+          loadMemberTable(memberRows);
+          if (window.tickerSummary) {
+            const memberSums = await window.tickerSummary.getTickerSummaries(memberRows.map(r => r.ticker));
+            loadMemberTable(memberRows, memberSums);
+          }
+        }
       }
     } catch(err) {
       console.warn('Profile check failed:', err);
