@@ -1,18 +1,11 @@
 // =====================================================================
 // Allin Signal · Supabase client
-// ---------------------------------------------------------------------
-// 1. Paste your project's URL + anon key below.
-// 2. Include this file on any page that needs auth or data:
-//    <script type="module" src="js/supabase-client.js"></script>
-// 3. Then access `window.allin` from your page scripts.
 // =====================================================================
 
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/+esm';
 
-// ---------- CONFIG — paste your values here -------------------------
 const SUPABASE_URL  = 'https://ojmbqmbiyjpokhspcjbs.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9qbWJxbWJpeWpwb2toc3BjamJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgwODg2MzEsImV4cCI6MjA5MzY2NDYzMX0._09_Y3dx5L1e85HR5jDI8y6bDY9hhBh2PgrjUOT1Phk';
-// --------------------------------------------------------------------
 
 const isConfigured =
   SUPABASE_URL && !SUPABASE_URL.includes('YOUR-PROJECT-REF') &&
@@ -24,7 +17,7 @@ const supabase = isConfigured
     })
   : null;
 
-// ----- Auth helpers --------------------------------------------------
+// ----- Auth ----------------------------------------------------------
 async function signUp(email, password) {
   return supabase.auth.signUp({ email, password });
 }
@@ -85,26 +78,72 @@ async function searchSignal(ticker) {
   return data;
 }
 
-// ----- Watchlist -----------------------------------------------------
-async function getWatchlist() {
+// ----- Watchlists ----------------------------------------------------
+async function getWatchlists() {
   if (!supabase) return [];
   const { data, error } = await supabase
-    .from('watchlist_items')
-    .select('*, signal:signals(*)')
-    .order('added_at', { ascending: false });
-  if (error) { console.warn('getWatchlist:', error); return []; }
+    .from('watchlists')
+    .select('*')
+    .order('created_at', { ascending: true });
+  if (error) { console.warn('getWatchlists:', error); return []; }
   return data || [];
 }
 
-async function addToWatchlist(ticker) {
+async function createWatchlist(name) {
+  const u = await currentUser();
+  if (!u) throw new Error('Not signed in');
+  const { data, error } = await supabase
+    .from('watchlists')
+    .insert({ user_id: u.id, name })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function deleteWatchlist(id) {
+  return supabase.from('watchlists').delete().eq('id', id);
+}
+
+async function renameWatchlist(id, name) {
+  return supabase.from('watchlists').update({ name }).eq('id', id);
+}
+
+// ----- Watchlist items -----------------------------------------------
+async function getWatchlistItems(watchlistId = null) {
+  if (!supabase) return [];
+
+  let query = supabase
+    .from('watchlist_items')
+    .select('*')
+    .order('added_at', { ascending: false });
+  if (watchlistId) query = query.eq('watchlist_id', watchlistId);
+
+  const { data: items, error } = await query;
+  if (error) { console.warn('getWatchlistItems:', error); return []; }
+  if (!items?.length) return [];
+
+  // Fetch signal data separately to avoid FK dependency
+  const tickers = [...new Set(items.map(i => i.ticker))];
+  const { data: signals } = await supabase
+    .from('signals')
+    .select('*')
+    .in('ticker', tickers);
+
+  const sigMap = Object.fromEntries((signals || []).map(s => [s.ticker, s]));
+  return items.map(item => ({ ...item, signal: sigMap[item.ticker] || null }));
+}
+
+async function addToWatchlist(ticker, watchlistId = null) {
   const u = await currentUser();
   if (!u) throw new Error('Not signed in');
   ticker = ticker.toUpperCase();
   const sig = await searchSignal(ticker);
   return supabase.from('watchlist_items').insert({
-    user_id: u.id,
+    user_id:      u.id,
     ticker,
-    added_price: sig?.price ?? null,
+    watchlist_id: watchlistId,
+    added_price:  sig?.price ?? null,
   });
 }
 
@@ -121,7 +160,7 @@ async function recentChanges(limit = 20) {
   if (!supabase) return [];
   const { data, error } = await supabase
     .from('rating_changes')
-    .select('*, signal:signals(company_name)')
+    .select('*')
     .order('changed_at', { ascending: false })
     .limit(limit);
   if (error) { console.warn('recentChanges:', error); return []; }
@@ -134,9 +173,9 @@ window.allin = {
   isConfigured,
   signUp, signIn, signOut, currentUser, currentProfile,
   topSignals, allSignals, searchSignal,
-  getWatchlist, addToWatchlist, removeFromWatchlist, toggleAlerts,
+  getWatchlists, createWatchlist, deleteWatchlist, renameWatchlist,
+  getWatchlistItems, addToWatchlist, removeFromWatchlist, toggleAlerts,
   recentChanges,
 };
 
-// Tell other scripts the client is ready.
 window.dispatchEvent(new Event('allin:ready'));

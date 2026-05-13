@@ -132,6 +132,11 @@
   .wl-spark { width: 100px; height: 32px; }
   .wl-spark svg { display: block; width: 100%; height: 100%; }
 
+  .wl-tab { padding: 7px 14px; border-radius: 7px; font-size: 13px; color: var(--fg-1); border: 1px solid var(--line-soft); display: flex; align-items: center; gap: 8px; }
+  .wl-tab.active { background: var(--bg-2); color: var(--fg-0); border-color: var(--accent); }
+  .wl-tab-del { opacity: 0; width: 14px; height: 14px; display: grid; place-items: center; border-radius: 3px; color: var(--fg-3); }
+  .wl-tab:hover .wl-tab-del { opacity: 1; }
+  .wl-tab-del:hover { color: var(--sell); background: var(--sell-soft); }
   .changes-section { margin-top: 28px; }
   .section-h { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--fg-2); font-weight: 600; margin-bottom: 12px; }
   .feed { display: grid; gap: 8px; }
@@ -225,6 +230,16 @@
 
 <!-- Member view -->
 <section class="state" id="memberState" style="display:none;">
+
+  <!-- Watchlist selector bar -->
+  <div class="wl-selector" id="wlSelector" style="margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;flex:1" id="wlTabs"></div>
+    <button class="add-btn" id="newWlBtn">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+      New watchlist
+    </button>
+  </div>
+
   <div class="member-toolbar">
     <div class="search-box">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
@@ -433,25 +448,69 @@
   document.getElementById('lockedSubscribe').addEventListener('click', () => { window.location.href = 'Pricing.html'; });
   document.getElementById('topUpgrade').addEventListener('click', () => { window.location.href = 'Pricing.html'; });
 
-  render();
+  // ----- Supabase multi-watchlist integration -------------------------
+  let allWatchlists = [];
+  let activeWlId    = null;
 
-  // Supabase integration
   async function loadFromSupabase() {
     if (!window.allin?.isConfigured) return;
-
     const profile = await window.allin.currentProfile();
-    if (!profile?.is_subscribed) return; // stay on locked state
+    if (!profile?.is_subscribed) return;
 
     setMode('member');
+    document.getElementById('addBtn').onclick    = addRealTicker;
+    document.getElementById('newWlBtn').onclick  = createNewWatchlist;
+    document.getElementById('wlSearch').onkeydown = e => { if (e.key === 'Enter') addRealTicker(); };
 
-    const rows = await window.allin.getWatchlist();
+    allWatchlists = await window.allin.getWatchlists();
 
+    // Migrate legacy items (no watchlist_id) into a default watchlist
+    if (allWatchlists.length === 0) {
+      const wl = await window.allin.createWatchlist('My Watchlist');
+      allWatchlists = [wl];
+      // Assign any existing items to this new list
+      await window.allin.supabase
+        .from('watchlist_items')
+        .update({ watchlist_id: wl.id })
+        .is('watchlist_id', null);
+    }
+
+    if (!activeWlId || !allWatchlists.find(w => w.id === activeWlId)) {
+      activeWlId = allWatchlists[0].id;
+    }
+
+    renderTabs();
+    await loadActiveList();
+  }
+
+  function renderTabs() {
+    const container = document.getElementById('wlTabs');
+    container.innerHTML = '';
+    allWatchlists.forEach(wl => {
+      const tab = document.createElement('button');
+      tab.className = 'wl-tab' + (wl.id === activeWlId ? ' active' : '');
+      tab.innerHTML = `${wl.name}<span class="wl-tab-del" data-del="${wl.id}" title="Delete">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </span>`;
+      tab.addEventListener('click', async e => {
+        const del = e.target.closest('[data-del]');
+        if (del) { await deleteList(del.dataset.del); return; }
+        activeWlId = wl.id;
+        renderTabs();
+        await loadActiveList();
+      });
+      container.appendChild(tab);
+    });
+  }
+
+  async function loadActiveList() {
+    const rows = await window.allin.getWatchlistItems(activeWlId);
     if (rows.length === 0) {
       watchlist = [];
       document.getElementById('wlBody').innerHTML = `
         <div style="padding:48px 24px;text-align:center;color:var(--fg-2)">
-          <div style="font-size:15px;font-weight:600;color:var(--fg-1);margin-bottom:8px">Your watchlist is empty</div>
-          <div style="font-size:13px">Search a ticker above and press Add to start tracking it.</div>
+          <div style="font-size:15px;font-weight:600;color:var(--fg-1);margin-bottom:8px">This watchlist is empty</div>
+          <div style="font-size:13px">Search a ticker above and click Add to start tracking it.</div>
         </div>`;
       document.getElementById('sumCount').textContent = '0';
       document.getElementById('sumBuy').textContent   = '0';
@@ -471,9 +530,6 @@
       }));
       render();
     }
-
-    document.getElementById('addBtn').onclick = addRealTicker;
-    document.getElementById('wlSearch').onkeydown = e => { if (e.key === 'Enter') addRealTicker(); };
   }
 
   async function addRealTicker() {
@@ -485,24 +541,43 @@
     btn.textContent = 'Adding…';
     btn.disabled = true;
     try {
-      const { error } = await window.allin.addToWatchlist(t);
+      const { error } = await window.allin.addToWatchlist(t, activeWlId);
       if (error?.code === '23505') {
         inp.value = '';
-        inp.placeholder = `${t} is already in your watchlist`;
-        setTimeout(() => { inp.placeholder = 'Search a ticker to add — AAPL, MSFT, NVDA…'; }, 2500);
+        inp.placeholder = `${t} is already in this watchlist`;
       } else if (error) {
         inp.placeholder = `Could not add ${t} — check the ticker symbol`;
-        setTimeout(() => { inp.placeholder = 'Search a ticker to add — AAPL, MSFT, NVDA…'; }, 2500);
       } else {
         inp.value = '';
-        await loadFromSupabase();
+        await loadActiveList();
       }
+      setTimeout(() => { inp.placeholder = 'Search a ticker to add — AAPL, MSFT, NVDA…'; }, 2500);
     } catch(e) {
       inp.placeholder = 'Something went wrong — try again';
       setTimeout(() => { inp.placeholder = 'Search a ticker to add — AAPL, MSFT, NVDA…'; }, 2500);
     }
     btn.innerHTML = origHTML;
     btn.disabled = false;
+  }
+
+  async function createNewWatchlist() {
+    const name = prompt('Watchlist name:');
+    if (!name?.trim()) return;
+    const wl = await window.allin.createWatchlist(name.trim());
+    allWatchlists.push(wl);
+    activeWlId = wl.id;
+    renderTabs();
+    await loadActiveList();
+  }
+
+  async function deleteList(id) {
+    if (allWatchlists.length <= 1) { alert('You must have at least one watchlist.'); return; }
+    if (!confirm(`Delete this watchlist and all its tickers?`)) return;
+    await window.allin.deleteWatchlist(id);
+    allWatchlists = allWatchlists.filter(w => w.id !== id);
+    if (activeWlId === id) activeWlId = allWatchlists[0].id;
+    renderTabs();
+    await loadActiveList();
   }
 
   document.getElementById('wlBody').addEventListener('click', async e => {
@@ -514,7 +589,7 @@
       e.stopImmediatePropagation();
       btn.disabled = true;
       await window.allin.removeFromWatchlist(row._id);
-      await loadFromSupabase();
+      await loadActiveList();
     }
   }, true);
 

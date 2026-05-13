@@ -383,6 +383,13 @@
   .alert-btn:hover { background: var(--bg-3); }
   .upgrade-btn { background: var(--buy); color: var(--logo-fg); }
   .upgrade-btn:hover { filter: brightness(1.06); }
+  .wl-picker { position: absolute; bottom: 68px; left: 14px; right: 14px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; z-index: 20; overflow: hidden; box-shadow: 0 8px 24px oklch(0 0 0 / 0.4); }
+  .wl-picker-head { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--fg-2); font-weight: 600; padding: 10px 14px 6px; }
+  .wl-picker-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; font-size: 13px; cursor: pointer; border-top: 1px solid var(--line-soft); }
+  .wl-picker-item:hover { background: var(--bg-3); }
+  .wl-picker-item svg { color: var(--accent); flex: none; }
+  .wl-picker-new { width: 100%; padding: 10px 14px; font-size: 13px; text-align: left; display: flex; align-items: center; gap: 8px; color: var(--accent); border-top: 1px solid var(--line-soft); }
+  .wl-picker-new:hover { background: var(--bg-3); }
 
   /* ---------- Subscribe modal ---------- */
   .modal-scrim {
@@ -679,6 +686,15 @@
     <h4 class="drawer-section-title">Why this signal</h4>
     <ul class="checklist" id="dChecklist"></ul>
   </div>
+  <!-- Watchlist picker panel -->
+  <div class="wl-picker" id="wlPicker" style="display:none">
+    <div class="wl-picker-head">Add to watchlist</div>
+    <div id="wlPickerList"></div>
+    <button class="wl-picker-new" id="wlPickerNew">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+      New watchlist
+    </button>
+  </div>
   <div class="drawer-foot">
     <button class="alert-btn" id="alertBtn">
       <svg width="14" height="14" style="vertical-align:-2px; margin-right:6px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0112 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 004 0"/></svg>
@@ -941,30 +957,97 @@
     if (!window.allin?.isConfigured) { closeDrawer(); goToPricing(); }
   });
 
-  // ---- Watchlist button ----
-  document.getElementById('watchlistBtn').addEventListener('click', async () => {
+  // ---- Watchlist picker ----
+  const wlPicker    = document.getElementById('wlPicker');
+  const wlPickerList = document.getElementById('wlPickerList');
+  let pickerOpen = false;
+
+  function closePicker() { wlPicker.style.display = 'none'; pickerOpen = false; }
+
+  async function openPicker() {
     if (!currentSignal) return;
     const profile = await window.allin?.currentProfile();
     if (!profile?.is_subscribed) { closeDrawer(); goToPricing(); return; }
 
-    const btn = document.getElementById('watchlistBtn');
+    const lists = await window.allin.getWatchlists();
+
+    wlPickerList.innerHTML = '';
+    if (lists.length === 0) {
+      // No watchlists yet — create default and add immediately
+      const btn = document.getElementById('watchlistBtn');
+      btn.textContent = 'Creating…';
+      btn.disabled = true;
+      try {
+        const wl = await window.allin.createWatchlist('My Watchlist');
+        await doAdd(currentSignal.t, wl.id, btn);
+      } finally { btn.disabled = false; }
+      return;
+    }
+
+    lists.forEach(wl => {
+      const item = document.createElement('button');
+      item.className = 'wl-picker-item';
+      item.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>${wl.name}`;
+      item.addEventListener('click', async () => {
+        closePicker();
+        const btn = document.getElementById('watchlistBtn');
+        await doAdd(currentSignal.t, wl.id, btn);
+      });
+      wlPickerList.appendChild(item);
+    });
+
+    wlPicker.style.display = '';
+    pickerOpen = true;
+  }
+
+  async function doAdd(ticker, watchlistId, btn) {
     btn.textContent = 'Adding…';
     btn.disabled = true;
     try {
-      const { error } = await window.allin.addToWatchlist(currentSignal.t);
+      const { error } = await window.allin.addToWatchlist(ticker, watchlistId);
       if (error?.code === '23505') {
-        btn.textContent = '✓ Already in watchlist';
+        btn.textContent = '✓ Already in list';
       } else if (error) {
         btn.textContent = 'Error — try again';
         btn.disabled = false;
+        return;
       } else {
         btn.textContent = '✓ Added!';
       }
     } catch(e) {
       btn.textContent = 'Error — try again';
       btn.disabled = false;
+      return;
     }
     setTimeout(() => { btn.textContent = '+ Add to Watchlist'; btn.disabled = false; }, 2500);
+  }
+
+  document.getElementById('watchlistBtn').addEventListener('click', () => {
+    if (pickerOpen) { closePicker(); return; }
+    openPicker();
+  });
+
+  document.getElementById('wlPickerNew').addEventListener('click', async () => {
+    const name = prompt('Watchlist name:');
+    if (!name?.trim()) return;
+    closePicker();
+    const btn = document.getElementById('watchlistBtn');
+    btn.textContent = 'Creating…';
+    btn.disabled = true;
+    try {
+      const wl = await window.allin.createWatchlist(name.trim());
+      await doAdd(currentSignal.t, wl.id, btn);
+    } catch(e) {
+      btn.textContent = 'Error — try again';
+      btn.disabled = false;
+    }
+  });
+
+  // Close picker when clicking outside
+  document.addEventListener('click', e => {
+    if (pickerOpen && !wlPicker.contains(e.target) && e.target.id !== 'watchlistBtn') {
+      closePicker();
+    }
   });
 
   // ---- Paywall: all CTAs go to Pricing page first ----
