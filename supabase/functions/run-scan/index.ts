@@ -18,11 +18,10 @@ const supabase    = createClient(SB_URL, SB_SERVICE);
 // ---------- CONFIG ---------------------------------------------------
 const SMA_WEEKS  = 200;                     // 200-week SMA
 const SMA_DAYS   = SMA_WEEKS * 5;           // ~1000 trading days
-const LOOKBACK_DAYS = 4 * 252;              // 4-year confidence window (~1008 days)
+const LOOKBACK_DAYS = 3 * 252;              // 3-year confidence window (~756 days)
 const HISTORY_DAYS = SMA_DAYS + LOOKBACK_DAYS + 50; // ~2058 days needed
 const MARKET_CAP_MIN = 10_000_000_000;      // $10B — large cap floor (no upper limit)
 const MAX_DISTANCE_ABOVE_SMA = 0.10;        // 0–10% above SMA = BUY zone
-const MOMENTUM_WINDOW = 40;                 // ~8 trading weeks for direction detection
 
 // ====== ALLIN MODEL ===================================================
 // Buy zone: price is 0–10% above its 200-week SMA.
@@ -59,41 +58,10 @@ function rate(closes: number[], marketCap: number) {
 
   const trackRecord = daysAbove / lookback;
 
-  let confidence: number;
-  if (rating === "BUY") {
-    // Proximity: 1.0 when touching SMA, 0.0 when 10% above
-    const proximityScore = 1 - (distance / MAX_DISTANCE_ABOVE_SMA);
-
-    // Direction: did the stock stay ABOVE the SMA and pull back toward it (on sale)?
-    // Or did it recently cross UP from below (breakout = not a bargain)?
-    // Check the lowest close in the last 8 weeks vs current SMA.
-    const recentWindow = closes.slice(-MOMENTUM_WINDOW);
-    const recentLow = Math.min(...recentWindow);
-    const crossedFromBelow = recentLow < sma; // was below SMA recently = came from below
-
-    // Also check 8-week momentum direction
-    const mWindow = Math.min(MOMENTUM_WINDOW, closes.length - 1);
-    const momentum = (closes[closes.length - 1] - closes[closes.length - 1 - mWindow])
-                     / closes[closes.length - 1 - mWindow];
-
-    let directionScore: number;
-    if (crossedFromBelow) {
-      directionScore = 0.0; // recently came from below = breakout, not a pullback
-    } else if (momentum < 0) {
-      directionScore = 1.0; // declining toward SMA from above = ideal "on sale" entry
-    } else {
-      directionScore = Math.max(0, 1 - momentum / MAX_DISTANCE_ABOVE_SMA);
-    }
-
-    // Entry quality blends proximity with direction equally
-    const entryScore = 0.5 * proximityScore + 0.5 * directionScore;
-
-    // Track record dominates (70%); entry quality is the tiebreaker (30%)
-    confidence = 0.7 * trackRecord + 0.3 * entryScore;
-  } else {
-    confidence = trackRecord;
-  }
-  confidence = Math.round(confidence * 1000) / 1000;
+  // Confidence = pure 3-year track record: % of days above rolling 200-week SMA.
+  // Stocks that consistently trade above their long-term trend rank highest.
+  // The BUY zone filter (0–10% above SMA) already handles entry timing.
+  const confidence = Math.round(trackRecord * 1000) / 1000;
 
   return { rating, confidence, trend_base: sma };
 }
