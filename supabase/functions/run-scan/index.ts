@@ -64,15 +64,26 @@ function rate(closes: number[], marketCap: number) {
     // Proximity: 1.0 when touching SMA, 0.0 when 10% above
     const proximityScore = 1 - (distance / MAX_DISTANCE_ABOVE_SMA);
 
-    // Direction: is price declining toward SMA (ideal "on sale" entry)?
-    // Negative 8-week momentum = approaching from above = full score.
-    // Rising momentum = just crossed from below = penalized.
+    // Direction: did the stock stay ABOVE the SMA and pull back toward it (on sale)?
+    // Or did it recently cross UP from below (breakout = not a bargain)?
+    // Check the lowest close in the last 8 weeks vs current SMA.
+    const recentWindow = closes.slice(-MOMENTUM_WINDOW);
+    const recentLow = Math.min(...recentWindow);
+    const crossedFromBelow = recentLow < sma; // was below SMA recently = came from below
+
+    // Also check 8-week momentum direction
     const mWindow = Math.min(MOMENTUM_WINDOW, closes.length - 1);
     const momentum = (closes[closes.length - 1] - closes[closes.length - 1 - mWindow])
                      / closes[closes.length - 1 - mWindow];
-    const directionScore = momentum < 0
-      ? 1.0
-      : Math.max(0, 1 - momentum / MAX_DISTANCE_ABOVE_SMA);
+
+    let directionScore: number;
+    if (crossedFromBelow) {
+      directionScore = 0.0; // recently came from below = breakout, not a pullback
+    } else if (momentum < 0) {
+      directionScore = 1.0; // declining toward SMA from above = ideal "on sale" entry
+    } else {
+      directionScore = Math.max(0, 1 - momentum / MAX_DISTANCE_ABOVE_SMA);
+    }
 
     // Entry quality blends proximity with direction equally
     const entryScore = 0.5 * proximityScore + 0.5 * directionScore;
