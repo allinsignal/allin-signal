@@ -188,9 +188,70 @@ async function runScan() {
   }
 }
 
-Deno.serve(async (_req) => {
+// ====== BACKFILL ======================================================
+// Fetches 9 years of daily bars for all active tickers with insufficient
+// history. Run once via run_history_backfill() SQL function.
+async function runBackfill() {
+  const FROM_DATE  = "2017-01-01";
+  const MIN_BARS   = 1800;
+  const CONCURRENCY = 20;
+
+  const { data: universe } = await supabase
+    .from("tickers").select("ticker").eq("active", true);
+  if (!universe?.length) return { ok: true, message: "No active tickers" };
+
+  // Find tickers with insufficient history
+  const counts = await Promise.all(
+    universe.map(async u => {
+      const { count } = await supabase
+        .from("price_history").select("*", { count: "exact", head: true })
+        .eq("ticker", u.ticker);
+      return { ticker: u.ticker, count: count ?? 0 };
+    })
+  );
+  const needs = counts.filter(c => c.count < MIN_BARS).map(c => c.ticker);
+  console.log(`Backfilling ${needs.length} tickers`);
+
+  const to = new Date().toISOString().slice(0, 10);
+  const results: { ticker: string; bars: number }[] = [];
+
+  for (let i = 0; i < needs.length; i += CONCURRENCY) {
+    const wave = needs.slice(i, i + CONCURRENCY);
+    const waveResults = await Promise.all(wave.map(async ticker => {
+      try {
+        const url = `https://api.polygon.io/v2/aggs/ticker/${ticker}/range/1/day/${FROM_DATE}/${to}?adjusted=true&sort=asc&limit=10000&apiKey=${POLYGON_KEY}`;
+        const res = await fetch(url);
+        if (!res.ok) return { ticker, bars: 0 };
+        const json = await res.json();
+        const bars = (json.results || []).map((r: any) => ({
+          ticker,
+          trade_date: new Date(r.t).toISOString().slice(0, 10),
+          open: r.o, high: r.h, low: r.l, close: r.c, volume: r.v,
+        }));
+        for (let j = 0; j < bars.length; j += 1000) {
+          await supabase.from("price_history").upsert(bars.slice(j, j + 1000));
+        }
+        return { ticker, bars: bars.length };
+      } catch {
+        return { ticker, bars: 0 };
+      }
+    }));
+    results.push(...waveResults);
+  }
+
+  return {
+    ok: true,
+    total: results.length,
+    succeeded: results.filter(r => r.bars > 0).length,
+    failed: results.filter(r => r.bars === 0).length,
+  };
+}
+// =====================================================================
+
+Deno.serve(async (req) => {
   try {
-    const result = await runScan();
+    const body = await req.json().catch(() => ({}));
+    const result = body.mode === "backfill" ? await runBackfill() : await runScan();
     return new Response(JSON.stringify(result), {
       headers: { "Content-Type": "application/json" },
     });
