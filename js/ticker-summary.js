@@ -3,11 +3,14 @@
 (function () {
   async function getTickerSummaries(tickers) {
     if (!tickers?.length || !window.allin?.supabase) return {};
-    const { data, error } = await window.allin.supabase
-      .rpc('get_ticker_summaries', { p_tickers: tickers });
-    if (error || !data) return {};
+    const BATCH = 50;
     const map = {};
-    data.forEach(d => { map[d.ticker] = d; });
+    for (let i = 0; i < tickers.length; i += BATCH) {
+      const batch = tickers.slice(i, i + BATCH);
+      const { data, error } = await window.allin.supabase
+        .rpc('get_ticker_summaries', { p_tickers: batch });
+      if (!error && data) data.forEach(d => { map[d.ticker] = d; });
+    }
     return map;
   }
 

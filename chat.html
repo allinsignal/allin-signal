@@ -370,8 +370,8 @@
 
   </div><!-- end .chat-main -->
 
-  <!-- Buy signals sidebar -->
-  <aside class="signals-sidebar" id="signalsSidebar">
+  <!-- Buy signals sidebar (subscribers only) -->
+  <aside class="signals-sidebar" id="signalsSidebar" style="display:none">
     <div class="sidebar-header">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
       Buy Signals
@@ -865,8 +865,6 @@
   window.addEventListener('allin:ready', async () => {
     if (!window.allin?.isConfigured) return;
 
-    loadSignalsSidebar();
-
     currentUser = await window.allin.currentUser();
     if (!currentUser) {
       document.getElementById('signInBtn').style.display = '';
@@ -876,6 +874,8 @@
     const profile = await window.allin.currentProfile();
     if (!profile?.is_subscribed) return; // stays on gate
 
+    document.getElementById('signalsSidebar').style.display = '';
+    loadSignalsSidebar();
     initChat(profile);
 
     // Update topbar
