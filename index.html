@@ -652,10 +652,10 @@
     <h2>All buy signals · <span id="buyCount">2,184</span> tickers</h2>
     <div class="sub">Full universe ranked by Allin Signal strength, trend age, and volume confirmation.</div>
   </div>
-  <div class="filters">
-    <button class="filter active">All</button>
-    <button class="filter">Buy</button>
-    <button class="filter">Sell</button>
+  <div class="filters" id="tableFilters">
+    <button class="filter active" data-filter="All">All</button>
+    <button class="filter" data-filter="Buy">Buy</button>
+    <button class="filter" data-filter="Sell">Sell</button>
   </div>
 </div>
 
@@ -1225,15 +1225,6 @@
   rebindPayTabs();
   rebindForm();
 
-  // ---- Filter buttons (UI only) ----
-  document.querySelectorAll('.filters').forEach(group => {
-    group.querySelectorAll('.filter').forEach(btn => {
-      btn.addEventListener('click', () => {
-        group.querySelectorAll('.filter').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-      });
-    });
-  });
 
   // ---- Theme toggle ----
   const moonIcon = `<path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/>`;
@@ -1328,9 +1319,32 @@
   }
 
   const PAGE_SIZE = 25;
+  let allMemberRows = [];
   let memberRows = [];
   let memberSumsCache = {};
   let currentPage = 0;
+  let activeTableFilter = 'All';
+
+  function applyTableFilter() {
+    if (activeTableFilter === 'Buy') {
+      memberRows = allMemberRows.filter(r => r.rating === 'BUY');
+    } else if (activeTableFilter === 'Sell') {
+      memberRows = allMemberRows.filter(r => r.rating === 'SELL');
+    } else {
+      memberRows = allMemberRows.slice();
+    }
+    currentPage = 0;
+    renderTablePage();
+  }
+
+  document.getElementById('tableFilters').querySelectorAll('.filter').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.getElementById('tableFilters').querySelectorAll('.filter').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeTableFilter = btn.dataset.filter;
+      applyTableFilter();
+    });
+  });
 
   function renderTablePage() {
     const tbl = document.getElementById('lockedTable');
@@ -1388,12 +1402,11 @@
   }
 
   function loadMemberTable(rows, sums) {
-    memberRows = rows || [];
+    allMemberRows = rows || [];
     memberSumsCache = Object.assign(memberSumsCache, sums || {});
-    currentPage = 0;
-    renderTablePage();
+    applyTableFilter();
     const buyCount = document.getElementById('buyCount');
-    if (buyCount) buyCount.textContent = memberRows.length.toLocaleString() + '+';
+    if (buyCount) buyCount.textContent = allMemberRows.length.toLocaleString() + '+';
   }
 
   document.getElementById('pgPrev').addEventListener('click', () => {
