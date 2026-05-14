@@ -71,11 +71,12 @@ async function freeSignals() {
   return [...top2, ...mid5];
 }
 
-async function allSignals(limit = 500) {
+async function allSignals(limit = 2000) {
   if (!supabase) return [];
   const { data, error } = await supabase
     .from('signals')
     .select('*')
+    .order('rating', { ascending: true })       // BUY before SELL
     .order('confidence', { ascending: false })
     .limit(limit);
   if (error) { console.warn('allSignals:', error); return []; }

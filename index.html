@@ -1040,24 +1040,18 @@
     if (sparkPrices?.length) {
       chart.innerHTML = renderDrawerChart(sparkPrices, s.rating || 'BUY');
     } else {
-      const sp = sparkPath(i + 11, 540, 200, 16, 16);
-      const area = `${sp.pPrice} L540 200 L0 200 Z`;
-      chart.innerHTML = `
-        <defs>
-          <linearGradient id="dg" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="oklch(0.80 0.17 150)" stop-opacity="0.25"/>
-            <stop offset="100%" stop-color="oklch(0.80 0.17 150)" stop-opacity="0"/>
-          </linearGradient>
-          <pattern id="dgrid" width="60" height="40" patternUnits="userSpaceOnUse">
-            <path d="M60 0H0V40" fill="none" stroke="oklch(0.26 0.01 250)" stroke-width="0.5"/>
-          </pattern>
-        </defs>
-        <rect width="540" height="200" fill="url(#dgrid)"/>
-        <path d="${area}" fill="url(#dg)"/>
-        <path d="${sp.pEma}" stroke="oklch(0.78 0.14 220)" stroke-width="1.6" fill="none" stroke-dasharray="5 4"/>
-        <path d="${sp.pPrice}" stroke="oklch(0.80 0.17 150)" stroke-width="2" fill="none"/>
-        <circle cx="${sp.lastX - 2}" cy="${sp.lastY}" r="4" fill="oklch(0.80 0.17 150)"/>
-        <circle cx="${sp.lastX - 2}" cy="${sp.lastY}" r="9" fill="oklch(0.80 0.17 150)" opacity="0.15"/>`;
+      chart.innerHTML = `<text x="50%" y="50%" text-anchor="middle" dominant-baseline="middle" fill="var(--fg-3)" font-size="13">Loading chart…</text>`;
+      if (window.tickerSummary) {
+        window.tickerSummary.getTickerSummaries([s.t]).then(sums => {
+          Object.assign(summaries, sums);
+          const spark = sums[s.t]?.spark;
+          if (spark?.length) {
+            chart.innerHTML = renderDrawerChart(spark, s.rating || 'BUY');
+          } else {
+            chart.innerHTML = `<text x="50%" y="50%" text-anchor="middle" dominant-baseline="middle" fill="var(--fg-3)" font-size="13">No chart data available</text>`;
+          }
+        });
+      }
     }
 
     drawer.classList.add('open');
@@ -1465,7 +1459,7 @@
       const profile = await window.allin.currentProfile();
       if (profile?.is_subscribed) {
         unlockMember();
-        const allRows = await window.allin.allSignals(200);
+        const allRows = await window.allin.allSignals();
         if (allRows?.length) {
           loadMemberTable(allRows);
           if (window.tickerSummary) {
