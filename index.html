@@ -1331,7 +1331,10 @@
     } else if (activeTableFilter === 'Sell') {
       memberRows = allMemberRows.filter(r => r.rating === 'SELL');
     } else {
-      memberRows = allMemberRows.slice();
+      // All: BUY signals first (ranked by confidence), then SELL
+      const buys  = allMemberRows.filter(r => r.rating === 'BUY');
+      const sells = allMemberRows.filter(r => r.rating === 'SELL');
+      memberRows  = [...buys, ...sells];
     }
     currentPage = 0;
     renderTablePage();
