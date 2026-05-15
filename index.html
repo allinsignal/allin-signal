@@ -1128,14 +1128,24 @@
       ? `Signal strength ${dist.toFixed(2)}% — below the trend baseline.`
       : `Signal strength +${dist.toFixed(2)}% — within the high-conviction zone.`;
 
-    const ok = '<svg class="ok" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg>';
-    document.getElementById('dChecklist').innerHTML = [
-      [`Trend baseline confirmed at daily close`, ok, `+${dist.toFixed(2)}%`],
-      [`Within high-conviction strength band`,      ok, `${dist.toFixed(2)}%`],
-      [`Volume above 30-period average`,            ok, `+18%`],
-      [`Long-term trend slope rising`,              ok, `+0.4°`],
-      [`No bearish reversal in last 4 weeks`,       ok, `clean`],
-    ].map(([label, mark, val]) => `<li>${mark}<span>${label}</span><b class="mono">${val}</b></li>`).join('');
+    const ok  = '<svg class="ok" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg>';
+    const bad = '<svg class="ok" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--sell)" stroke-width="2.4"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+    const distFmt = (dist >= 0 ? '+' : '') + dist.toFixed(2) + '%';
+    const checklistItems = isSell ? [
+      [`Price below 200-week trend baseline`,   bad, distFmt],
+      [`Outside the high-conviction buy zone`,  bad, distFmt],
+      [`Downtrend relative to long-term SMA`,   bad, `below`],
+      [`Not within buy signal criteria`,        bad, `no signal`],
+      [`Monitoring for trend recovery`,         bad, `watching`],
+    ] : [
+      [`Price above 200-week trend baseline`,   ok, distFmt],
+      [`Within high-conviction strength band`,  ok, distFmt],
+      [`Volume above 30-period average`,        ok, `+18%`],
+      [`Long-term trend slope rising`,          ok, `+0.4°`],
+      [`No bearish reversal in last 4 weeks`,   ok, `clean`],
+    ];
+    document.getElementById('dChecklist').innerHTML = checklistItems
+      .map(([label, mark, val]) => `<li>${mark}<span>${label}</span><b class="mono">${val}</b></li>`).join('');
 
     const chart = document.getElementById('dChart');
     const sparkPrices = summaries[s.t]?.spark;
@@ -1421,7 +1431,8 @@
           const s = {
             t: sig.ticker, n: sig.company_name || sig.ticker,
             price: Number(sig.price), ema: Number(sig.trend_base ?? sig.price),
-            chg: Number(sig.weekly_change ?? 0), mcap: sig.market_cap_band || 'Mid',
+            chg: Number(sig.weekly_change ?? 0), conf: Number(sig.confidence ?? 0),
+            mcap: sig.market_cap_band || 'Mid', rating: sig.rating || 'BUY',
           };
           openDrawer(s, 0);
         } else {
