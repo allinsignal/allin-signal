@@ -368,10 +368,10 @@ function initAdmin() {
     scanLog.innerHTML = '';
     log(scanLog, 'Starting daily scan…');
     try {
-      const res = await callFn({ mode: 'scan' });
-      if (!res.ok) throw new Error(res.error || 'Scan failed');
-      log(scanLog, `✓ Scan complete for ${res.date}`, 'ok');
-      log(scanLog, `  ${res.tickers} tickers · ${res.buys} buys · ${res.flips} flips`, 'ok');
+      const { ok, data } = await callFn({ mode: 'scan' });
+      if (!ok) throw new Error(data?.error || 'Scan failed');
+      log(scanLog, `✓ Scan complete for ${data.date}`, 'ok');
+      log(scanLog, `  ${data.tickers} tickers · ${data.buys} buys · ${data.flips} flips`, 'ok');
     } catch (e) {
       log(scanLog, `✗ ${e.message}`, 'warn');
     }
