@@ -133,6 +133,18 @@
   .conf-text { font-size: 11px; color: var(--fg-2); font-family: 'JetBrains Mono', monospace; }
   .card-time { font-size: 11px; color: var(--fg-3); margin-left: auto; white-space: nowrap; }
 
+  /* Card action buttons */
+  .card-actions { display: flex; gap: 6px; margin-top: 10px; }
+  .card-action-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 5px 10px; border-radius: 6px; font-size: 11px; font-weight: 600;
+    border: 1px solid var(--line-soft); color: var(--fg-2); background: var(--bg-0);
+    cursor: pointer; transition: background 0.1s, color 0.1s, border-color 0.1s;
+    font-family: inherit;
+  }
+  .card-action-btn:hover { background: var(--bg-3); color: var(--fg-0); border-color: var(--line); }
+  .card-action-btn.wl-added { color: var(--buy); border-color: var(--buy); }
+
   /* Load more */
   .load-more-wrap { padding: 24px 0 0; text-align: center; }
   .load-more-btn { padding: 10px 24px; border-radius: 8px; font-size: 13px; font-weight: 600; border: 1px solid var(--line); color: var(--fg-1); background: var(--bg-1); transition: background 0.1s, color 0.1s; }
@@ -390,6 +402,20 @@
               ${confText ? `<span class="conf-text">${escHtml(confText)}</span>` : ''}
               <span class="card-time">${fmtDateTime(alert.changed_at)}</span>
             </div>
+            <div class="card-actions">
+              <button class="card-action-btn tv-btn" data-ticker="${escHtml(alert.ticker)}">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                Chart
+              </button>
+              <button class="card-action-btn discuss-btn" data-ticker="${escHtml(alert.ticker)}">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                Discuss
+              </button>
+              <button class="card-action-btn watchlist-btn" data-ticker="${escHtml(alert.ticker)}">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+                Watchlist
+              </button>
+            </div>
           </div>
         </div>`;
     }
@@ -397,13 +423,57 @@
     feedEl.innerHTML = html;
     feedEl.classList.add('visible');
 
-    // Click to navigate
+    // Card click → signals page
     feedEl.querySelectorAll('.alert-card').forEach(card => {
-      const navigate = () => {
-        window.location.href = `index.html#${card.dataset.ticker}`;
-      };
+      const navigate = () => window.location.href = `index.html#${card.dataset.ticker}`;
       card.addEventListener('click', navigate);
       card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') navigate(); });
+    });
+
+    // TradingView chart
+    feedEl.querySelectorAll('.tv-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        window.open(`https://www.tradingview.com/chart/?symbol=${btn.dataset.ticker}`, '_blank');
+      });
+    });
+
+    // Discuss in chat
+    feedEl.querySelectorAll('.discuss-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        window.location.href = `chat.html#${btn.dataset.ticker}`;
+      });
+    });
+
+    // Add to watchlist
+    feedEl.querySelectorAll('.watchlist-btn').forEach(btn => {
+      btn.addEventListener('click', async e => {
+        e.stopPropagation();
+        const ticker = btn.dataset.ticker;
+        const origHTML = btn.innerHTML;
+        btn.disabled = true;
+        btn.textContent = '…';
+        try {
+          let lists = await window.allin.getWatchlists();
+          if (!lists?.length) {
+            await window.allin.createWatchlist('My Watchlist');
+            lists = await window.allin.getWatchlists();
+          }
+          if (lists?.length) {
+            await window.allin.addToWatchlist(ticker, lists[0].id);
+            btn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg> Added`;
+            btn.classList.add('wl-added');
+          }
+        } catch(_) {
+          btn.textContent = 'Error';
+        }
+        setTimeout(() => {
+          btn.innerHTML = origHTML;
+          btn.classList.remove('wl-added');
+          btn.disabled = false;
+        }, 2000);
+      });
     });
   }
 
