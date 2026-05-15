@@ -996,7 +996,7 @@
       card.className = 'signal-card';
       card.dataset.idx = i;
       card.innerHTML = `
-        <div class="sc-rank mono">#${String(i + 1).padStart(2, '0')}</div>
+        <div class="sc-rank mono">#${String(i + 1).padStart(2, '0')}${s.isBest ? ' <span class="badge-top">BEST</span>' : ''}</div>
         <div class="sc-head">
           <div class="sc-logo" style="background:${hashColor(s.t)};color:var(--logo-fg)">${s.t.slice(0, 2)}</div>
           <div>
@@ -1593,6 +1593,7 @@
             conf: Number(r.confidence ?? 0),
             mcap: r.market_cap_band || 'Mega',
             rating: r.rating || 'BUY',
+            isBest: true,
           }));
           renderGrid();
 
