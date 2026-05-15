@@ -162,6 +162,20 @@
     <div class="log" id="scanLog"><span class="dim">Output will appear here…</span></div>
   </div>
 
+  <!-- ── Price History Backfill ────────────────────────────────── -->
+  <div class="card">
+    <div class="card-title">Price History Backfill — Polygon</div>
+    <div class="card-desc">
+      Fetches 5 years of daily bars from Polygon for any ticker with insufficient
+      price history. Run this after adding new tickers (like ETFs) so sparklines
+      and YTD returns show correctly. Takes 15–30 seconds.
+    </div>
+    <div class="row">
+      <button class="btn btn-primary" id="priceBackfillBtn">Run Price Backfill</button>
+    </div>
+    <div class="log" id="priceLog"><span class="dim">Output will appear here…</span></div>
+  </div>
+
   <!-- ── Full Backfill ──────────────────────────────────────────── -->
   <div class="card">
     <div class="card-title">SMA Backfill — All Active Tickers</div>
@@ -358,6 +372,23 @@ function initAdmin() {
     }
     running = false;
     backfillAllBtn.disabled = false;
+  });
+
+  // ── Price history backfill (Polygon) ────────────────────────────
+  const priceBackfillBtn = document.getElementById('priceBackfillBtn');
+  const priceLog         = document.getElementById('priceLog');
+  priceBackfillBtn.addEventListener('click', async () => {
+    priceBackfillBtn.disabled = true;
+    priceLog.innerHTML = '';
+    log(priceLog, 'Fetching price history from Polygon…');
+    try {
+      const { ok, data } = await callFn({ mode: 'backfill' });
+      if (!ok) throw new Error(data?.error || 'Backfill failed');
+      log(priceLog, `✓ Done — ${data.succeeded} succeeded, ${data.failed} failed out of ${data.total} tickers`, 'ok');
+    } catch (e) {
+      log(priceLog, `✗ ${e.message}`, 'warn');
+    }
+    priceBackfillBtn.disabled = false;
   });
 
   // ── Daily scan ──────────────────────────────────────────────────
