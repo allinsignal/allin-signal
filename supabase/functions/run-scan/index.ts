@@ -96,7 +96,7 @@ async function runScan() {
     const { date, rows } = await mostRecentTradingDate();
     console.log(`Scanning ${rows.length} tickers for ${date}`);
 
-    // 1. Upsert today's bars
+    // 1. Upsert today's bars (batched — a handful of DB calls for the whole market)
     const bars = rows.map(r => ({
       ticker: r.T, trade_date: date,
       open: r.o, high: r.h, low: r.l, close: r.c, volume: r.v,
@@ -105,108 +105,21 @@ async function runScan() {
       await supabase.from("price_history").upsert(bars.slice(i, i + 1000));
     }
 
-    // 2. Load eligible universe (large/mega cap: $10B+)
-    const { data: universe } = await supabase
-      .from("tickers")
-      .select("ticker, name, market_cap")
-      .gte("market_cap", MARKET_CAP_MIN)
-      .eq("active", true);
+    // 2. Compute today's 200-week SMA for all eligible tickers (single SQL call)
+    await supabase.rpc("update_today_sma");
 
-    const capMap = new Map(universe?.map(u => [u.ticker, u]) || []);
-    console.log(`Eligible by market cap: ${capMap.size}`);
-
-    // 3. For each eligible ticker, pull history + SMA + run the model
-    let flips = 0;
-    const newSignals: any[] = [];
-    const ratingChanges: any[] = [];
-    const smaUpserts: any[] = [];
-
-    for (const r of rows) {
-      const u = capMap.get(r.T);
-      if (!u) continue;
-
-      // Fetch price history (date + close)
-      const { data: hist } = await supabase
-        .from("price_history")
-        .select("trade_date, close")
-        .eq("ticker", r.T)
-        .order("trade_date", { ascending: true });
-      if (!hist?.length) continue;
-
-      const closes = hist.map(h => Number(h.close));
-      const dates  = hist.map(h => h.trade_date as string);
-
-      // Fetch SMA history
-      const threeYearsAgo = new Date();
-      threeYearsAgo.setFullYear(threeYearsAgo.getFullYear() - 3);
-      const { data: smaRows } = await supabase
-        .from("sma_history")
-        .select("trade_date, sma_200w")
-        .eq("ticker", r.T)
-        .gte("trade_date", threeYearsAgo.toISOString().slice(0, 10))
-        .order("trade_date", { ascending: true });
-
-      const smaMap = new Map<string, number>(
-        (smaRows || []).map(s => [s.trade_date as string, Number(s.sma_200w)])
-      );
-
-      // Compute today's SMA from price_history if we have enough bars
-      if (closes.length >= SMA_DAYS) {
-        const recentCloses = closes.slice(-SMA_DAYS);
-        const todaySma = recentCloses.reduce((a, b) => a + b, 0) / SMA_DAYS;
-        smaMap.set(date, todaySma);
-        smaUpserts.push({ ticker: r.T, trade_date: date, sma_200w: todaySma });
-      }
-
-      const out = rate(closes, smaMap, dates, u.market_cap || 0);
-      if (!out) continue;
-
-      const { data: prev } = await supabase
-        .from("signals").select("rating").eq("ticker", r.T).maybeSingle();
-      if (prev && prev.rating !== out.rating) {
-        ratingChanges.push({ ticker: r.T, from_rating: prev.rating, to_rating: out.rating });
-        flips++;
-      }
-
-      newSignals.push({
-        ticker: r.T,
-        company_name: u.name || r.T,
-        price: r.c,
-        trend_base: out.trend_base,
-        rating: out.rating,
-        confidence: out.confidence,
-        weekly_change: 0,
-        rated_at: new Date().toISOString(),
-      });
-    }
-
-    // 4. Persist today's SMA values
-    for (let i = 0; i < smaUpserts.length; i += 500) {
-      await supabase.from("sma_history").upsert(smaUpserts.slice(i, i + 500));
-    }
-
-    // 5. Mark top 10 BUYs by confidence
-    newSignals.sort((a, b) =>
-      a.rating === b.rating
-        ? b.confidence - a.confidence
-        : a.rating === "BUY" ? -1 : 1);
-    newSignals.forEach((s, i) => s.is_top10 = s.rating === "BUY" && i < 10);
-
-    for (let i = 0; i < newSignals.length; i += 500) {
-      await supabase.from("signals").upsert(newSignals.slice(i, i + 500));
-    }
-    if (ratingChanges.length) {
-      await supabase.from("rating_changes").insert(ratingChanges);
-    }
+    // 3. Run signal model + write signals + log flips (single SQL call)
+    const { data: result, error } = await supabase.rpc("run_signal_scan");
+    if (error) throw new Error(error.message);
 
     await supabase.from("scan_runs").update({
       status: "success",
       finished_at: new Date().toISOString(),
-      tickers_seen: newSignals.length,
-      flips_count: flips,
+      tickers_seen: result?.signals ?? 0,
+      flips_count: result?.flips ?? 0,
     }).eq("id", runId);
 
-    return { ok: true, date, tickers: newSignals.length, flips };
+    return { ok: true, date, tickers: result?.signals ?? 0, buys: result?.buys ?? 0, flips: result?.flips ?? 0 };
   } catch (e) {
     await supabase.from("scan_runs").update({
       status: "failed",
