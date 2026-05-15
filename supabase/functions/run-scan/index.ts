@@ -286,12 +286,23 @@ async function runBackfill() {
 // =====================================================================
 
 Deno.serve(async (req) => {
+  // Parse body robustly — req.json() can silently fail in some invocation contexts
+  let mode = "scan";
   try {
-    const body = await req.json().catch(() => ({}));
+    const text = await req.text();
+    if (text?.trim()) {
+      const parsed = JSON.parse(text);
+      if (parsed?.mode) mode = parsed.mode;
+    }
+  } catch (_) { /* no body or invalid JSON → default to scan */ }
+
+  console.log(`run-scan invoked: mode=${mode}`);
+
+  try {
     let result;
-    if (body.mode === "sma_backfill") {
+    if (mode === "sma_backfill") {
       result = await runSmaBackfill();
-    } else if (body.mode === "backfill") {
+    } else if (mode === "backfill") {
       result = await runBackfill();
     } else {
       result = await runScan();
@@ -300,7 +311,10 @@ Deno.serve(async (req) => {
       headers: { "Content-Type": "application/json" },
     });
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), {
+    const msg = e instanceof Error ? e.message : String(e);
+    const stack = e instanceof Error ? e.stack : undefined;
+    console.error(`run-scan error (mode=${mode}):`, msg, stack);
+    return new Response(JSON.stringify({ error: msg, stack, mode }), {
       status: 500, headers: { "Content-Type": "application/json" },
     });
   }
