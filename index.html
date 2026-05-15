@@ -879,7 +879,7 @@
       <svg width="14" height="14" style="vertical-align:-2px; margin-right:6px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
       Discuss
     </button>
-    <button class="alert-btn" id="chartBtn" style="flex:0 0 auto;padding:11px 14px" title="View full chart">
+    <button class="alert-btn" id="chartBtn" style="flex:0 0 auto;padding:11px 14px" title="View on TradingView">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
     </button>
     <button class="upgrade-btn" id="watchlistBtn">+ Add to Watchlist</button>
@@ -1187,7 +1187,7 @@
     }
   });
   document.getElementById('chartBtn').addEventListener('click', () => {
-    if (currentSignal) openChart(currentSignal.t, currentSignal.n);
+    if (currentSignal) window.open(`https://www.tradingview.com/chart/?symbol=${currentSignal.t}`, '_blank');
   });
 
   // ---- Watchlist picker ----
@@ -1677,7 +1677,6 @@
 
 <script type="module" src="js/supabase-client.js"></script>
 <script src="js/auth.js"></script>
-<script src="js/chart-modal.js"></script>
 <script src="js/ticker-summary.js"></script>
 <script src="js/disclaimer-banner.js"></script>
 
