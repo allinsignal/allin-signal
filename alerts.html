@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<link rel="icon" type="image/png" href="assets/allin-logo.png" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Signal Alerts — Allin Signal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<script>
+  try {
+    const t = localStorage.getItem('allin-theme');
+    if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+  } catch(e) {}
+</script>
+<style>
+  :root, [data-theme="dark"] {
+    --bg-0: oklch(0.16 0.008 250); --bg-1: oklch(0.20 0.010 250); --bg-2: oklch(0.235 0.011 250); --bg-3: oklch(0.27 0.012 250);
+    --line: oklch(0.32 0.012 250); --line-soft: oklch(0.26 0.010 250);
+    --fg-0: oklch(0.97 0.005 250); --fg-1: oklch(0.78 0.010 250); --fg-2: oklch(0.58 0.012 250); --fg-3: oklch(0.42 0.012 250);
+    --buy: oklch(0.80 0.17 150); --buy-soft: oklch(0.80 0.17 150 / 0.12);
+    --sell: oklch(0.68 0.21 25); --sell-soft: oklch(0.68 0.21 25 / 0.12);
+    --accent: oklch(0.78 0.14 220); --accent-soft: oklch(0.78 0.14 220 / 0.14);
+    --logo-fg: var(--bg-0); --topbar-bg: oklch(0.16 0.008 250 / 0.85);
+  }
+  [data-theme="light"] {
+    --bg-0: oklch(0.985 0.003 250); --bg-1: oklch(1 0 0); --bg-2: oklch(0.965 0.005 250); --bg-3: oklch(0.93 0.008 250);
+    --line: oklch(0.86 0.008 250); --line-soft: oklch(0.92 0.006 250);
+    --fg-0: oklch(0.20 0.010 250); --fg-1: oklch(0.36 0.012 250); --fg-2: oklch(0.52 0.014 250); --fg-3: oklch(0.68 0.012 250);
+    --buy: oklch(0.58 0.17 150); --buy-soft: oklch(0.58 0.17 150 / 0.10);
+    --sell: oklch(0.58 0.22 25); --sell-soft: oklch(0.58 0.22 25 / 0.10);
+    --accent: oklch(0.55 0.18 240); --accent-soft: oklch(0.55 0.18 240 / 0.10);
+    --logo-fg: oklch(0.99 0 0); --topbar-bg: oklch(0.985 0.003 250 / 0.85);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg-0); color: var(--fg-0); font-family: 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+  a { color: inherit; text-decoration: none; }
+  button { font-family: inherit; cursor: pointer; border: 0; background: transparent; color: inherit; }
+
+  /* Topbar */
+  .topbar { position: sticky; top: 0; z-index: 50; height: 56px; display: flex; align-items: center; padding: 0 20px; gap: 24px; background: var(--topbar-bg); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line-soft); }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: 0.02em; }
+  .brand-mark { width: 32px; height: 32px; background: url('assets/allin-logo.png') center/contain no-repeat; }
+  .brand-name { font-size: 15px; }
+  .brand-name span { color: var(--fg-2); font-weight: 500; }
+  .nav { display: flex; gap: 4px; margin-left: 8px; }
+  .nav a { padding: 8px 12px; border-radius: 6px; font-size: 13px; color: var(--fg-1); }
+  .nav a.active { color: var(--fg-0); background: var(--bg-2); }
+  .nav a:hover:not(.active) { color: var(--fg-0); }
+  .topbar-right { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+  .btn-ghost { padding: 7px 12px; border-radius: 6px; font-size: 13px; color: var(--fg-1); border: 1px solid var(--line-soft); }
+  .btn-ghost:hover { color: var(--fg-0); background: var(--bg-2); }
+  .btn-primary { padding: 7px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; color: var(--logo-fg); background: var(--buy); }
+  .btn-primary:hover { filter: brightness(1.06); }
+  .theme-toggle { width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center; color: var(--fg-2); border: 1px solid var(--line-soft); }
+  .theme-toggle:hover { background: var(--bg-2); color: var(--fg-0); }
+
+  /* Page layout */
+  .page { max-width: 760px; margin: 0 auto; padding: 0 20px 80px; }
+
+  /* Page header */
+  .page-header { padding: 36px 0 20px; }
+  .page-header h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 6px; }
+  .page-header p { color: var(--fg-1); font-size: 14px; line-height: 1.55; }
+
+  /* Stats row */
+  .stats-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px; }
+  .stat-chip { display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: var(--bg-1); border: 1px solid var(--line-soft); border-radius: 20px; font-size: 12px; color: var(--fg-1); }
+  .stat-chip strong { color: var(--fg-0); font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+  .stat-chip .dot-buy { width: 6px; height: 6px; border-radius: 50%; background: var(--buy); flex: none; }
+  .stat-chip .dot-sell { width: 6px; height: 6px; border-radius: 50%; background: var(--sell); flex: none; }
+  .stat-chip .dot-neutral { width: 6px; height: 6px; border-radius: 50%; background: var(--fg-3); flex: none; }
+
+  /* Filter tabs */
+  .filter-tabs { display: flex; gap: 4px; margin-bottom: 20px; padding: 3px; background: var(--bg-1); border: 1px solid var(--line-soft); border-radius: 8px; width: fit-content; }
+  .filter-tab { padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 500; color: var(--fg-2); transition: background 0.1s, color 0.1s; }
+  .filter-tab.active { background: var(--bg-0); color: var(--fg-0); font-weight: 600; }
+  .filter-tab:hover:not(.active) { color: var(--fg-1); }
+
+  /* Gate card */
+  .gate-wrap { display: grid; place-items: center; padding: 80px 20px; }
+  .gate-card { background: var(--bg-1); border: 1px solid var(--line-soft); border-radius: 16px; padding: 48px 40px; text-align: center; max-width: 440px; }
+  .gate-icon { width: 52px; height: 52px; margin: 0 auto 16px; border-radius: 14px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; }
+  .gate-card h2 { font-size: 22px; font-weight: 600; margin-bottom: 8px; }
+  .gate-card p { color: var(--fg-1); font-size: 14px; line-height: 1.55; margin-bottom: 22px; }
+  .gate-btn { display: inline-block; padding: 11px 24px; border-radius: 8px; background: var(--buy); color: var(--logo-fg); font-size: 14px; font-weight: 600; }
+  .gate-btn:hover { filter: brightness(1.06); }
+
+  /* Feed */
+  .feed { display: none; flex-direction: column; gap: 0; }
+  .feed.visible { display: flex; }
+
+  /* Date group label */
+  .date-label { display: flex; align-items: center; gap: 12px; padding: 18px 0 10px; color: var(--fg-3); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+  .date-label::before, .date-label::after { content: ''; flex: 1; height: 1px; background: var(--line-soft); }
+
+  /* Alert card */
+  .alert-card {
+    display: flex; align-items: flex-start; gap: 14px;
+    padding: 14px 16px; background: var(--bg-1);
+    border: 1px solid var(--line-soft); border-radius: 10px;
+    margin-bottom: 6px; cursor: pointer;
+    border-left: 3px solid var(--line);
+    transition: background 0.1s, border-color 0.1s;
+    position: relative;
+  }
+  .alert-card.buy-flip { border-left-color: var(--buy); }
+  .alert-card.sell-flip { border-left-color: var(--sell); }
+  .alert-card:hover { background: var(--bg-2); }
+
+  /* Logo circle */
+  .logo-circle {
+    width: 36px; height: 36px; border-radius: 10px; flex: none;
+    display: grid; place-items: center;
+    font-size: 12px; font-weight: 700; color: var(--logo-fg);
+    font-family: 'JetBrains Mono', monospace;
+    text-transform: uppercase; letter-spacing: 0.02em;
+  }
+
+  /* Card body */
+  .card-body { flex: 1; min-width: 0; }
+  .card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+  .card-ticker { font-size: 14px; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: var(--fg-0); }
+  .card-name { font-size: 12px; color: var(--fg-2); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pill-new { font-size: 9px; font-weight: 800; letter-spacing: 0.08em; padding: 2px 6px; border-radius: 4px; background: var(--accent); color: var(--logo-fg); flex: none; text-transform: uppercase; }
+
+  .card-bottom { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .change-badge { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 5px; display: inline-flex; align-items: center; gap: 4px; letter-spacing: 0.01em; }
+  .change-badge.buy-badge { background: var(--buy-soft); color: var(--buy); }
+  .change-badge.sell-badge { background: var(--sell-soft); color: var(--sell); }
+  .conf-text { font-size: 11px; color: var(--fg-2); font-family: 'JetBrains Mono', monospace; }
+  .card-time { font-size: 11px; color: var(--fg-3); margin-left: auto; white-space: nowrap; }
+
+  /* Load more */
+  .load-more-wrap { padding: 24px 0 0; text-align: center; }
+  .load-more-btn { padding: 10px 24px; border-radius: 8px; font-size: 13px; font-weight: 600; border: 1px solid var(--line); color: var(--fg-1); background: var(--bg-1); transition: background 0.1s, color 0.1s; }
+  .load-more-btn:hover { background: var(--bg-2); color: var(--fg-0); }
+
+  /* Empty state */
+  .empty-state { text-align: center; padding: 64px 20px; color: var(--fg-2); }
+  .empty-state svg { margin: 0 auto 16px; display: block; opacity: 0.4; }
+  .empty-state p { font-size: 14px; line-height: 1.5; }
+
+  /* Loading spinner */
+  .loading-state { text-align: center; padding: 48px 20px; color: var(--fg-3); font-size: 13px; }
+
+  /* Footer */
+  .footer { border-top: 1px solid var(--line-soft); padding: 28px 20px; text-align: center; color: var(--fg-3); font-size: 12px; }
+  .footer a { color: var(--accent); }
+  .footer a:hover { text-decoration: underline; }
+
+  @media (max-width: 600px) {
+    .page { padding: 0 12px 60px; }
+    .gate-card { padding: 36px 24px; }
+    .card-name { display: none; }
+    .nav a { display: none; }
+    .nav a.active { display: block; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark" role="img" aria-label="Allin Signal logo"></div>
+    <div class="brand-name">Allin Signal <span>· allinsignal.com</span></div>
+  </div>
+  <nav class="nav">
+    <a href="index.html">Signals</a>
+    <a href="methodology.html">Methodology</a>
+    <a href="watchlist.html">Watchlist</a>
+    <a href="alerts.html" class="active">Alerts</a>
+    <a href="pricing.html">Pricing</a>
+    <a href="chat.html">Chat</a>
+  </nav>
+  <div class="topbar-right">
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+      <svg id="themeIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>
+    </button>
+    <button class="btn-ghost" id="signInBtn" style="display:none">Sign in</button>
+    <button class="btn-primary" id="topUpgrade">Subscribe · $3/mo</button>
+  </div>
+</header>
+
+<main class="page">
+  <div class="page-header">
+    <h1>Signal Alerts</h1>
+    <p>Rating change events — when a stock flips from BUY to SELL or SELL to BUY.</p>
+  </div>
+
+  <!-- Gate (shown to non-subscribers) -->
+  <div class="gate-wrap" id="alertsGate">
+    <div class="gate-card">
+      <div class="gate-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+      </div>
+      <h2>Members-only alerts</h2>
+      <p>Get instant access to every rating flip — BUY to SELL and SELL to BUY — as they happen each Friday scan. Included with your $3/month subscription.</p>
+      <a class="gate-btn" href="pricing.html">Subscribe to unlock</a>
+    </div>
+  </div>
+
+  <!-- Feed (shown to subscribers) -->
+  <div id="alertsFeed" style="display:none">
+    <!-- Stats row -->
+    <div class="stats-row" id="statsRow">
+      <div class="stat-chip"><span class="dot-neutral"></span><strong id="statTotal">—</strong> Total alerts this week</div>
+      <div class="stat-chip"><span class="dot-buy"></span><strong id="statBuy">—</strong> → BUY flips</div>
+      <div class="stat-chip"><span class="dot-sell"></span><strong id="statSell">—</strong> → SELL flips</div>
+    </div>
+
+    <!-- Filter tabs -->
+    <div class="filter-tabs" role="tablist">
+      <button class="filter-tab active" data-filter="all" role="tab">All</button>
+      <button class="filter-tab" data-filter="buy" role="tab">→ BUY</button>
+      <button class="filter-tab" data-filter="sell" role="tab">→ SELL</button>
+    </div>
+
+    <!-- Loading -->
+    <div class="loading-state" id="loadingState">Loading alerts…</div>
+
+    <!-- Feed list -->
+    <div class="feed" id="feedList"></div>
+
+    <!-- Empty state -->
+    <div class="empty-state" id="emptyState" style="display:none">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>
+      </svg>
+      <p>No rating changes yet — check back after the next scan.</p>
+    </div>
+
+    <!-- Load more -->
+    <div class="load-more-wrap" id="loadMoreWrap" style="display:none">
+      <button class="load-more-btn" id="loadMoreBtn">Load more</button>
+    </div>
+  </div>
+</main>
+
+<footer class="footer">
+  &copy; 2025 Allin Signal · <a href="methodology.html">Methodology</a> · <a href="pricing.html">Pricing</a>
+</footer>
+
+<script>
+  // ---- Theme toggle ----
+  const moonIcon = `<path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/>`;
+  const sunIcon  = `<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>`;
+  function updateThemeIcon() {
+    const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+    document.getElementById('themeIcon').innerHTML = isDark ? moonIcon : sunIcon;
+  }
+  updateThemeIcon();
+  document.getElementById('themeToggle').addEventListener('click', () => {
+    const next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('allin-theme', next); } catch(e) {}
+    updateThemeIcon();
+  });
+
+  document.getElementById('topUpgrade').addEventListener('click', () => window.location.href = 'pricing.html');
+
+  // ---- Hash color (same as index.html) ----
+  function hashColor(t) {
+    let h = 0;
+    for (const c of t) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+    return `oklch(0.65 0.13 ${h % 360})`;
+  }
+
+  // ---- Format helpers ----
+  function fmtTime(ts) {
+    const d = new Date(ts);
+    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  }
+  function fmtDateTime(ts) {
+    const d = new Date(ts);
+    return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+  }
+  function dateLabel(ts) {
+    const d = new Date(ts);
+    const today = new Date();
+    const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
+    if (d.toDateString() === today.toDateString()) return 'Today';
+    if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+    return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  }
+  function initials(ticker) {
+    return ticker.slice(0, 2).toUpperCase();
+  }
+
+  // ---- State ----
+  let allAlerts = [];
+  let activeFilter = 'all';
+  let displayCount = 50;
+  let lastVisit = null;
+
+  // ---- Load last-visit timestamp ----
+  try {
+    lastVisit = localStorage.getItem('allin-alerts-last-visit');
+  } catch(e) {}
+
+  // ---- Update last-visit to now ----
+  try {
+    localStorage.setItem('allin-alerts-last-visit', new Date().toISOString());
+  } catch(e) {}
+
+  // ---- Compute if alert is "new" ----
+  function isNew(alert) {
+    if (!lastVisit) return false;
+    return new Date(alert.changed_at) > new Date(lastVisit);
+  }
+
+  // ---- Get week start (7 days ago) for stats ----
+  function weekStart() {
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    return d;
+  }
+
+  // ---- Compute stats ----
+  function computeStats(alerts) {
+    const ws = weekStart();
+    const thisWeek = alerts.filter(a => new Date(a.changed_at) >= ws);
+    const buyFlips = thisWeek.filter(a => a.to_rating === 'BUY').length;
+    const sellFlips = thisWeek.filter(a => a.to_rating === 'SELL').length;
+    document.getElementById('statTotal').textContent = thisWeek.length;
+    document.getElementById('statBuy').textContent   = buyFlips;
+    document.getElementById('statSell').textContent  = sellFlips;
+  }
+
+  // ---- Filter alerts ----
+  function filtered() {
+    if (activeFilter === 'buy')  return allAlerts.filter(a => a.to_rating === 'BUY');
+    if (activeFilter === 'sell') return allAlerts.filter(a => a.to_rating === 'SELL');
+    return allAlerts;
+  }
+
+  // ---- Render feed ----
+  function renderFeed() {
+    const feedEl     = document.getElementById('feedList');
+    const emptyEl    = document.getElementById('emptyState');
+    const loadMoreEl = document.getElementById('loadMoreWrap');
+
+    const alerts = filtered();
+    const visible = alerts.slice(0, displayCount);
+
+    if (!visible.length) {
+      feedEl.innerHTML = '';
+      feedEl.classList.remove('visible');
+      emptyEl.style.display = '';
+      loadMoreEl.style.display = 'none';
+      return;
+    }
+
+    emptyEl.style.display = 'none';
+    loadMoreEl.style.display = alerts.length > displayCount ? '' : 'none';
+
+    // Group by date label
+    let html = '';
+    let lastLabel = null;
+    for (const alert of visible) {
+      const label = dateLabel(alert.changed_at);
+      if (label !== lastLabel) {
+        lastLabel = label;
+        html += `<div class="date-label">${label}</div>`;
+      }
+
+      const isBuyFlip  = alert.to_rating === 'BUY';
+      const flipClass  = isBuyFlip ? 'buy-flip' : 'sell-flip';
+      const badgeClass = isBuyFlip ? 'buy-badge' : 'sell-badge';
+      const changeText = `${alert.from_rating} → ${alert.to_rating}`;
+      const confText   = alert.confidence != null ? `${Math.round(alert.confidence * 100)}% conf` : '';
+      const newPill    = isNew(alert) ? `<span class="pill-new">New</span>` : '';
+      const color      = hashColor(alert.ticker);
+      const inits      = initials(alert.ticker);
+      const companyName = alert.company_name || alert.ticker;
+
+      html += `
+        <div class="alert-card ${flipClass}" data-ticker="${escHtml(alert.ticker)}" role="button" tabindex="0" aria-label="${changeText} for ${alert.ticker}">
+          <div class="logo-circle" style="background:${color}">${escHtml(inits)}</div>
+          <div class="card-body">
+            <div class="card-top">
+              <span class="card-ticker">${escHtml(alert.ticker)}</span>
+              <span class="card-name">${escHtml(companyName)}</span>
+              ${newPill}
+            </div>
+            <div class="card-bottom">
+              <span class="change-badge ${badgeClass}">${escHtml(changeText)}</span>
+              ${confText ? `<span class="conf-text">${escHtml(confText)}</span>` : ''}
+              <span class="card-time">${fmtDateTime(alert.changed_at)}</span>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    feedEl.innerHTML = html;
+    feedEl.classList.add('visible');
+
+    // Click to navigate
+    feedEl.querySelectorAll('.alert-card').forEach(card => {
+      const navigate = () => {
+        window.location.href = `index.html#${card.dataset.ticker}`;
+      };
+      card.addEventListener('click', navigate);
+      card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') navigate(); });
+    });
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ---- Load alerts ----
+  async function loadAlerts() {
+    document.getElementById('loadingState').style.display = '';
+
+    const alerts = await window.allin.recentChanges(200);
+    allAlerts = alerts;
+
+    document.getElementById('loadingState').style.display = 'none';
+    computeStats(alerts);
+    renderFeed();
+  }
+
+  // ---- Filter tabs ----
+  document.querySelectorAll('.filter-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      activeFilter = tab.dataset.filter;
+      displayCount = 50;
+      renderFeed();
+    });
+  });
+
+  // ---- Load more ----
+  document.getElementById('loadMoreBtn').addEventListener('click', () => {
+    displayCount += 50;
+    renderFeed();
+  });
+
+  // ---- Auth flow ----
+  window.addEventListener('allin:ready', async () => {
+    if (!window.allin?.isConfigured) {
+      // Not configured — show gate
+      return;
+    }
+
+    const currentUser = await window.allin.currentUser();
+    if (!currentUser) {
+      document.getElementById('signInBtn').style.display = '';
+      return;
+    }
+
+    const profile = await window.allin.currentProfile();
+    if (!profile?.is_subscribed) {
+      // Show gate
+      return;
+    }
+
+    // Subscribed — hide gate, show feed
+    document.getElementById('alertsGate').style.display = 'none';
+    document.getElementById('alertsFeed').style.display = '';
+
+    // Update topbar
+    document.getElementById('signInBtn').style.display = 'none';
+    const upgradeBtn = document.getElementById('topUpgrade');
+    upgradeBtn.textContent = 'Member ✦';
+    upgradeBtn.style.background = 'var(--accent)';
+    upgradeBtn.style.cursor = 'default';
+    upgradeBtn.onclick = null;
+
+    loadAlerts();
+  });
+</script>
+
+<script type="module" src="js/supabase-client.js"></script>
+<script src="js/auth.js"></script>
+</body>
+</html>

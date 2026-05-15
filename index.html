@@ -634,6 +634,7 @@
     <a href="#" class="active">Signals</a>
     <a href="methodology.html" class="hide-mobile">Methodology</a>
     <a href="watchlist.html" class="hide-mobile">Watchlist</a>
+    <a href="alerts.html" class="hide-mobile">Alerts</a>
     <a href="pricing.html">Pricing</a>
     <a href="chat.html" class="hide-mobile">Chat</a>
   </nav>
@@ -655,6 +656,7 @@
   <a href="#" class="active">Signals</a>
   <a href="methodology.html">Methodology</a>
   <a href="watchlist.html">Watchlist</a>
+  <a href="alerts.html">Alerts</a>
   <a href="pricing.html">Pricing</a>
   <a href="chat.html">Chat</a>
   <div class="mobile-nav-divider"></div>
@@ -1180,7 +1182,7 @@
   document.getElementById('drawerClose').addEventListener('click', closeDrawer);
   scrim.addEventListener('click', closeDrawer);
   document.getElementById('alertBtn').addEventListener('click', () => {
-    if (!window.allin?.isConfigured) { closeDrawer(); goToPricing(); }
+    window.location.href = 'alerts.html';
   });
   document.getElementById('chartBtn').addEventListener('click', () => {
     if (currentSignal) openChart(currentSignal.t, currentSignal.n);

@@ -186,7 +186,7 @@ async function toggleAlerts(id, enabled) {
 }
 
 // ----- Rating changes feed -------------------------------------------
-async function recentChanges(limit = 20) {
+async function recentChanges(limit = 200) {
   if (!supabase) return [];
   const { data, error } = await supabase
     .from('rating_changes')
@@ -194,7 +194,15 @@ async function recentChanges(limit = 20) {
     .order('changed_at', { ascending: false })
     .limit(limit);
   if (error) { console.warn('recentChanges:', error); return []; }
-  return data || [];
+  if (!data?.length) return [];
+  // Enrich with company name + confidence from signals
+  const tickers = [...new Set(data.map(r => r.ticker))];
+  const { data: sigs } = await supabase
+    .from('signals').select('ticker, company_name, confidence')
+    .in('ticker', tickers);
+  const sigMap = {};
+  if (sigs) sigs.forEach(s => { sigMap[s.ticker] = s; });
+  return data.map(r => ({ ...r, company_name: sigMap[r.ticker]?.company_name || r.ticker, confidence: sigMap[r.ticker]?.confidence ?? null }));
 }
 
 // ----- Expose globally -----------------------------------------------
