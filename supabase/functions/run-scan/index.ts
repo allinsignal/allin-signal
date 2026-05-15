@@ -134,95 +134,93 @@ async function runScan() {
 }
 
 // ====== SMA BACKFILL ==================================================
-// Fetches 10 years of daily bars from Yahoo Finance (free, no API key),
-// computes rolling 1000-day SMA for each date, stores in sma_history.
-// Run once via SELECT run_sma_backfill() in SQL Editor.
-async function runSmaBackfill() {
-  const { data: universe } = await supabase
-    .from("tickers").select("ticker").eq("active", true);
-  if (!universe?.length) return { ok: true, message: "No active tickers" };
-
-  const CONCURRENCY = 5; // Yahoo Finance is free-tier, keep low
-  const results: { ticker: string; rows: number }[] = [];
-
-  for (let i = 0; i < universe.length; i += CONCURRENCY) {
-    const wave = universe.slice(i, i + CONCURRENCY);
-    const waveResults = await Promise.all(wave.map(async ({ ticker }) => {
-      try {
-        const url = `https://query2.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=10y`;
-        const res = await fetch(url, {
-          headers: { "User-Agent": "Mozilla/5.0" },
-        });
-        if (!res.ok) {
-          console.warn(`Yahoo ${ticker}: ${res.status}`);
-          return { ticker, rows: 0 };
-        }
-        const json = await res.json();
-        const result = json?.chart?.result?.[0];
-        if (!result) return { ticker, rows: 0 };
-
-        const timestamps: number[] = result.timestamp || [];
-        const closes: number[]     = result.indicators?.quote?.[0]?.close || [];
-
-        // Build sorted date+close pairs, filter nulls
-        const pairs: { date: string; close: number }[] = [];
-        for (let j = 0; j < timestamps.length; j++) {
-          if (closes[j] == null) continue;
-          const d = new Date(timestamps[j] * 1000).toISOString().slice(0, 10);
-          pairs.push({ date: d, close: closes[j] });
-        }
-        pairs.sort((a, b) => a.date.localeCompare(b.date));
-
-        if (pairs.length < SMA_DAYS) {
-          console.warn(`Yahoo ${ticker}: only ${pairs.length} bars, need ${SMA_DAYS}`);
-          return { ticker, rows: 0 };
-        }
-
-        // Compute rolling SMA with sliding window
-        let windowSum = 0;
-        for (let j = 0; j < SMA_DAYS; j++) windowSum += pairs[j].close;
-
-        const smaRows: { ticker: string; trade_date: string; sma_200w: number }[] = [];
-        // First SMA value is at index SMA_DAYS - 1
-        smaRows.push({
-          ticker,
-          trade_date: pairs[SMA_DAYS - 1].date,
-          sma_200w: windowSum / SMA_DAYS,
-        });
-
-        for (let j = SMA_DAYS; j < pairs.length; j++) {
-          windowSum += pairs[j].close;
-          windowSum -= pairs[j - SMA_DAYS].close;
-          smaRows.push({
-            ticker,
-            trade_date: pairs[j].date,
-            sma_200w: windowSum / SMA_DAYS,
-          });
-        }
-
-        // Upsert in batches
-        for (let j = 0; j < smaRows.length; j += 500) {
-          await supabase.from("sma_history").upsert(smaRows.slice(j, j + 500));
-        }
-
-        console.log(`Yahoo ${ticker}: ${smaRows.length} SMA rows stored`);
-        return { ticker, rows: smaRows.length };
-      } catch (e) {
-        console.warn(`Yahoo ${ticker} error:`, e);
-        return { ticker, rows: 0 };
-      }
-    }));
-    results.push(...waveResults);
-
-    // Brief pause between waves to be polite to Yahoo
-    if (i + CONCURRENCY < universe.length) {
-      await new Promise(r => setTimeout(r, 500));
+// Fetch + compute + store 10-year SMA history for a single ticker.
+async function backfillOneTicker(ticker: string): Promise<{ ticker: string; rows: number; error?: string }> {
+  try {
+    const url = `https://query2.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=10y`;
+    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
+    if (!res.ok) {
+      console.warn(`Yahoo ${ticker}: ${res.status}`);
+      return { ticker, rows: 0, error: `HTTP ${res.status}` };
     }
+    const json = await res.json();
+    const result = json?.chart?.result?.[0];
+    if (!result) return { ticker, rows: 0, error: "no chart result" };
+
+    const timestamps: number[] = result.timestamp || [];
+    const closes: number[]     = result.indicators?.quote?.[0]?.close || [];
+
+    const pairs: { date: string; close: number }[] = [];
+    for (let j = 0; j < timestamps.length; j++) {
+      if (closes[j] == null) continue;
+      pairs.push({ date: new Date(timestamps[j] * 1000).toISOString().slice(0, 10), close: closes[j] });
+    }
+    pairs.sort((a, b) => a.date.localeCompare(b.date));
+
+    if (pairs.length < SMA_DAYS) {
+      console.warn(`Yahoo ${ticker}: only ${pairs.length} bars, need ${SMA_DAYS}`);
+      return { ticker, rows: 0, error: `only ${pairs.length} bars` };
+    }
+
+    let windowSum = 0;
+    for (let j = 0; j < SMA_DAYS; j++) windowSum += pairs[j].close;
+
+    const smaRows: { ticker: string; trade_date: string; sma_200w: number }[] = [{
+      ticker,
+      trade_date: pairs[SMA_DAYS - 1].date,
+      sma_200w: windowSum / SMA_DAYS,
+    }];
+    for (let j = SMA_DAYS; j < pairs.length; j++) {
+      windowSum += pairs[j].close;
+      windowSum -= pairs[j - SMA_DAYS].close;
+      smaRows.push({ ticker, trade_date: pairs[j].date, sma_200w: windowSum / SMA_DAYS });
+    }
+
+    for (let j = 0; j < smaRows.length; j += 500) {
+      await supabase.from("sma_history").upsert(smaRows.slice(j, j + 500));
+    }
+    console.log(`Yahoo ${ticker}: ${smaRows.length} SMA rows stored`);
+    return { ticker, rows: smaRows.length };
+  } catch (e) {
+    console.warn(`Yahoo ${ticker} error:`, e);
+    return { ticker, rows: 0, error: String(e) };
+  }
+}
+
+// sma_backfill modes:
+//   { mode: "sma_backfill", ticker: "AAPL" }  → single ticker (fast, use this for one-offs)
+//   { mode: "sma_backfill", limit: 20, offset: 0 } → batch of N tickers (avoid timeout)
+//   { mode: "sma_backfill" } → all tickers, 5 at a time (only works for small universes)
+async function runSmaBackfill(ticker?: string, limit?: number, offset = 0) {
+  // Single-ticker mode
+  if (ticker) {
+    const result = await backfillOneTicker(ticker.toUpperCase());
+    return { ok: true, total: 1, succeeded: result.rows > 0 ? 1 : 0, results: [result] };
   }
 
-  const succeeded = results.filter(r => r.rows > 0).length;
-  const failed    = results.filter(r => r.rows === 0).length;
-  return { ok: true, total: results.length, succeeded, failed };
+  const { data: universe } = await supabase
+    .from("tickers").select("ticker").eq("active", true).order("ticker");
+  if (!universe?.length) return { ok: true, message: "No active tickers" };
+
+  const slice   = limit ? universe.slice(offset, offset + limit) : universe;
+  const CONCURRENCY = 5;
+  const results: { ticker: string; rows: number }[] = [];
+
+  for (let i = 0; i < slice.length; i += CONCURRENCY) {
+    const wave = slice.slice(i, i + CONCURRENCY);
+    const waveResults = await Promise.all(wave.map(({ ticker: t }) => backfillOneTicker(t)));
+    results.push(...waveResults);
+    if (i + CONCURRENCY < slice.length) await new Promise(r => setTimeout(r, 500));
+  }
+
+  return {
+    ok: true,
+    total: results.length,
+    offset,
+    next_offset: limit ? offset + limit : null,
+    succeeded: results.filter(r => r.rows > 0).length,
+    failed: results.filter(r => r.rows === 0).length,
+  };
 }
 // =====================================================================
 
@@ -288,11 +286,12 @@ async function runBackfill() {
 Deno.serve(async (req) => {
   // Parse body robustly — req.json() can silently fail in some invocation contexts
   let mode = "scan";
+  let body: Record<string, unknown> = {};
   try {
     const text = await req.text();
     if (text?.trim()) {
-      const parsed = JSON.parse(text);
-      if (parsed?.mode) mode = parsed.mode;
+      body = JSON.parse(text);
+      if (body?.mode) mode = body.mode as string;
     }
   } catch (_) { /* no body or invalid JSON → default to scan */ }
 
@@ -301,7 +300,11 @@ Deno.serve(async (req) => {
   try {
     let result;
     if (mode === "sma_backfill") {
-      result = await runSmaBackfill();
+      result = await runSmaBackfill(
+        body.ticker as string | undefined,
+        body.limit  as number | undefined,
+        (body.offset as number | undefined) ?? 0,
+      );
     } else if (mode === "backfill") {
       result = await runBackfill();
     } else {
