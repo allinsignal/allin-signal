@@ -112,6 +112,9 @@ async function runScan() {
     const { data: result, error } = await supabase.rpc("run_signal_scan");
     if (error) throw new Error(error.message);
 
+    // 4. Recompute is_top10 with sma_clean gate (no breach in last 2 years required)
+    await supabase.rpc("update_top10_ranking");
+
     await supabase.from("scan_runs").update({
       status: "success",
       finished_at: new Date().toISOString(),
