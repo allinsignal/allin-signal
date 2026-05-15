@@ -57,18 +57,32 @@ async function topSignals(limit = 10) {
   return data || [];
 }
 
-// Free preview: top 2 BEST picks + ranks #11–#15 (skips the subscriber-only #3–#10).
+// Free preview: 5 random BUY picks, seeded by the most recent Monday's date.
+// The same 5 stocks show all week; a new set rotates in each Monday.
 async function freeSignals() {
   if (!supabase) return [];
-  const [top2res, mid5res] = await Promise.all([
-    supabase.from('signals').select('*').eq('rating', 'BUY')
-      .order('confidence', { ascending: false }).limit(2),
-    supabase.from('signals').select('*').eq('rating', 'BUY')
-      .order('confidence', { ascending: false }).range(10, 17),
-  ]);
-  const top2 = (top2res.data || []).map(r => ({ ...r, isBest: true }));
-  const mid5 = (mid5res.data || []).map(r => ({ ...r, isBest: false }));
-  return [...top2, ...mid5];
+  const { data, error } = await supabase
+    .from('signals').select('*').eq('rating', 'BUY')
+    .order('confidence', { ascending: false });
+  if (error || !data?.length) return [];
+
+  // Seed = YYYYMMDD of the most recent Monday (stable Mon–Sun, new set each week)
+  const now = new Date();
+  const dayOfWeek = now.getDay(); // 0=Sun … 6=Sat
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+  const seed = parseInt(monday.toISOString().slice(0, 10).replace(/-/g, ''), 10);
+
+  // LCG seeded Fisher-Yates shuffle — deterministic for a given seed
+  let s = seed >>> 0;
+  const rng = () => { s = Math.imul(s, 1664525) + 1013904223 >>> 0; return s / 0x100000000; };
+  const shuffled = [...data];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+
+  return shuffled.slice(0, 5);
 }
 
 async function allSignals(limit = 2000) {

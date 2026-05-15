@@ -227,7 +227,32 @@
   .msg-meta { display: flex; align-items: baseline; gap: 8px; margin-bottom: 3px; }
   .msg-name { font-size: 13px; font-weight: 600; }
   .msg-name.is-mod { color: var(--accent); }
-  .msg-name.is-mod::after { content: ' ✦'; font-size: 10px; }
+  .msg-name.is-mod::after { content: ' ✦ MOD'; font-size: 10px; font-weight: 700; letter-spacing: 0.05em; }
+  .msg-name.is-admin { color: oklch(0.83 0.19 85); }
+  .msg-name.is-admin::after { content: ' ♛ ADMIN'; font-size: 10px; font-weight: 700; letter-spacing: 0.05em; }
+  .msg-name[data-uid] { cursor: pointer; }
+  .msg-name[data-uid]:hover { text-decoration: underline; text-underline-offset: 2px; }
+
+  /* Role context menu */
+  .role-menu {
+    position: fixed; z-index: 500; min-width: 176px;
+    background: var(--bg-1); border: 1px solid var(--line);
+    border-radius: 9px; padding: 4px; display: none; flex-direction: column;
+    box-shadow: 0 8px 28px oklch(0 0 0 / 0.4);
+  }
+  .role-menu.open { display: flex; }
+  .role-menu-label {
+    padding: 7px 10px 5px; font-size: 11px; color: var(--fg-3);
+    font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .role-menu-item {
+    padding: 8px 12px; border-radius: 6px; font-size: 13px; text-align: left;
+    color: var(--fg-1); cursor: pointer; background: transparent; border: 0;
+    font-family: inherit; width: 100%;
+  }
+  .role-menu-item:hover { background: var(--bg-2); color: var(--fg-0); }
+  .role-menu-item.remove { color: var(--sell); }
+  .role-menu-item.remove:hover { background: var(--sell-soft); }
   .msg-time { font-size: 11px; color: var(--fg-3); }
   .msg-text { font-size: 14px; line-height: 1.5; color: var(--fg-0); word-break: break-word; }
   .msg-deleted { font-size: 13px; color: var(--fg-3); font-style: italic; }
@@ -430,7 +455,9 @@
   let currentUser    = null;
   let currentProfile = null;
   let isMod          = false;
+  let isAdmin        = false;
   let isBanned       = false;
+  const userRoles    = {}; // userId → { isMod, isAdmin }
   let realtimeChannel = null;
   let lastDateLabel  = null;
   const reactionsMap  = {}; // { [msgId]: { [emoji]: { count, mine } } }
@@ -510,17 +537,32 @@
     const initial = (msg.display_name || '?')[0].toUpperCase();
     const isOwn   = msg.user_id === currentUser?.id;
 
+    // Sender role badge
+    const sender        = userRoles[msg.user_id] || {};
+    const senderIsAdmin = sender.isAdmin;
+    const senderIsMod   = sender.isMod;
+    let nameClass = 'msg-name';
+    if (senderIsAdmin)     nameClass += ' is-admin';
+    else if (senderIsMod)  nameClass += ' is-mod';
+
+    // Admin can click any other user's name to manage their role
+    const nameAttrs = isAdmin && !isOwn
+      ? ` data-uid="${msg.user_id}" data-uname="${escHtml(msg.display_name)}" data-is-mod="${senderIsMod || senderIsAdmin}"`
+      : '';
+
+    const canMod = (isMod || isAdmin) && !isOwn;
+
     row.innerHTML = `
       <div class="msg-avatar" style="background:${nameColor(msg.display_name)}">${initial}</div>
       <div class="msg-body">
         <div class="msg-meta">
-          <span class="msg-name${isMod && !isOwn ? '' : ''}">${escHtml(msg.display_name)}</span>
+          <span class="${nameClass}"${nameAttrs}>${escHtml(msg.display_name)}</span>
           <span class="msg-time">${fmtTime(msg.created_at)}</span>
         </div>
         <div class="msg-text">${escHtml(msg.content)}</div>
         <div class="msg-reactions" id="rxn-${msg.id}"></div>
         <button class="react-btn" data-msgid="${msg.id}">☺ React</button>
-        ${isMod && !isOwn ? `
+        ${canMod ? `
           <div class="msg-actions">
             <button class="msg-action-btn" data-action="delete" data-id="${msg.id}" title="Delete message">Delete</button>
             <button class="msg-action-btn" data-action="ban"    data-uid="${msg.user_id}" data-name="${escHtml(msg.display_name)}" title="Ban user">Ban user</button>
@@ -547,8 +589,12 @@
   // ---- Load chat UI ----
   async function initChat(profile) {
     currentProfile = profile;
-    isMod    = !!profile.is_moderator;
+    isAdmin  = !!profile.is_admin;
+    isMod    = !!profile.is_moderator || isAdmin; // admin has all mod powers
     isBanned = false;
+
+    // Cache own role so own messages render with the right badge
+    userRoles[currentUser.id] = { isMod: !!profile.is_moderator, isAdmin };
 
     // Check if banned
     const { data: ban } = await window.allin.supabase
@@ -608,6 +654,18 @@
       .order('created_at', { ascending: false })
       .limit(200)
       .then(r => ({ ...r, data: r.data?.reverse() }));
+
+    // Pre-load roles for all message senders so badges render correctly
+    if (history?.length) {
+      const senderIds = [...new Set(history.map(m => m.user_id))].filter(id => !userRoles[id]);
+      if (senderIds.length) {
+        const { data: roles } = await window.allin.supabase
+          .from('profiles').select('id, is_moderator, is_admin').in('id', senderIds);
+        if (roles) roles.forEach(p => {
+          userRoles[p.id] = { isMod: !!p.is_moderator, isAdmin: !!p.is_admin };
+        });
+      }
+    }
 
     messagesArea.innerHTML = '';
     if (!history?.length) {
@@ -687,11 +745,67 @@
       }
     });
 
+    // Admin: click a username to manage their role
+    if (isAdmin) {
+      let roleMenuTarget = null;
+      const roleMenu = document.getElementById('roleMenu');
+
+      messagesArea.addEventListener('click', e => {
+        const nameEl = e.target.closest('.msg-name[data-uid]');
+        if (!nameEl) return;
+        e.stopPropagation();
+        const curIsMod = nameEl.dataset.isMod === 'true';
+        roleMenuTarget = { uid: nameEl.dataset.uid, uname: nameEl.dataset.uname, isMod: curIsMod, el: nameEl };
+        document.getElementById('roleMenuName').textContent = nameEl.dataset.uname;
+        document.getElementById('roleMenuMakeMod').style.display = curIsMod ? 'none' : '';
+        document.getElementById('roleMenuRemoveMod').style.display = curIsMod ? '' : 'none';
+        const rect = nameEl.getBoundingClientRect();
+        roleMenu.style.left = Math.min(rect.left, window.innerWidth - 190) + 'px';
+        roleMenu.style.top  = (rect.bottom + 4) + 'px';
+        roleMenu.classList.add('open');
+      });
+
+      document.getElementById('roleMenuMakeMod').addEventListener('click', async () => {
+        if (!roleMenuTarget) return;
+        const { uid } = roleMenuTarget;
+        await window.allin.supabase.rpc('set_moderator', { target_user_id: uid, make_mod: true });
+        userRoles[uid] = { ...(userRoles[uid] || {}), isMod: true };
+        messagesArea.querySelectorAll(`.msg-name[data-uid="${uid}"]`).forEach(el => {
+          el.className = 'msg-name is-mod';
+          el.dataset.isMod = 'true';
+        });
+        roleMenu.classList.remove('open');
+        roleMenuTarget = null;
+      });
+
+      document.getElementById('roleMenuRemoveMod').addEventListener('click', async () => {
+        if (!roleMenuTarget) return;
+        const { uid } = roleMenuTarget;
+        await window.allin.supabase.rpc('set_moderator', { target_user_id: uid, make_mod: false });
+        userRoles[uid] = { ...(userRoles[uid] || {}), isMod: false };
+        messagesArea.querySelectorAll(`.msg-name[data-uid="${uid}"]`).forEach(el => {
+          el.className = 'msg-name';
+          el.dataset.isMod = 'false';
+        });
+        roleMenu.classList.remove('open');
+        roleMenuTarget = null;
+      });
+
+      document.addEventListener('click', () => { roleMenu?.classList.remove('open'); roleMenuTarget = null; });
+    }
+
     // Subscribe to realtime
     realtimeChannel = window.allin.supabase
       .channel('public:chat')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
-        appendMessage(payload.new);
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async payload => {
+        const msg = payload.new;
+        // Fetch sender role if not cached so badge renders correctly
+        if (!userRoles[msg.user_id]) {
+          const { data } = await window.allin.supabase
+            .from('profiles').select('is_moderator, is_admin').eq('id', msg.user_id).maybeSingle();
+          userRoles[msg.user_id] = { isMod: !!data?.is_moderator, isAdmin: !!data?.is_admin };
+        }
+        appendMessage(msg);
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'message_reactions' }, payload => {
         addToMap(payload.new);
@@ -887,6 +1001,12 @@
     upgradeBtn.onclick = null;
   });
 </script>
+
+<div id="roleMenu" class="role-menu">
+  <div class="role-menu-label" id="roleMenuName"></div>
+  <button class="role-menu-item" id="roleMenuMakeMod">✦ Make moderator</button>
+  <button class="role-menu-item remove" id="roleMenuRemoveMod">Remove moderator</button>
+</div>
 
 <div id="emojiPicker">
   <span class="e-opt" data-emoji="👍">👍</span>

@@ -780,7 +780,7 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>
       </div>
       <h3>Unlock the full scanner for $3/month</h3>
-      <p>You're seeing the top 10. Members get the remaining 2,174 buy signals, the full sell list, ticker search, and weekly email alerts.</p>
+      <p>You're seeing 5 sample picks. Members get the full ranked list, all buy &amp; sell signals, ticker search, and weekly email alerts.</p>
       <div class="price-row"><span class="price mono">$3</span><span class="per">/ month · cancel anytime</span></div>
       <div class="perks">
         <div><svg class="check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12l5 5L20 6"/></svg> Full ticker list</div>
@@ -931,16 +931,11 @@
   let summaries = {};
 
   const signals = [
-    { t: 'KLVR',  n: 'Kelvr Semiconductors',  price: 118.42, ema: 116.05, chg: +2.04, mcap: 'Mega', rating: 'BUY'  },
-    { t: 'MAVN',  n: 'Maven Energy',           price: 364.20, ema: 358.97, chg: +1.95, mcap: 'Mega', rating: 'BUY'  },
-    { t: 'BRDG',  n: 'Bridgepath Capital',     price: 291.10, ema: 289.40, chg: +1.90, mcap: 'Mega', rating: 'BUY'  },
-    { t: 'AXIS',  n: 'Axis Robotics',          price: 203.40, ema: 199.85, chg: +1.78, mcap: 'Mega', rating: 'BUY'  },
-    { t: 'NRTH',  n: 'Northwind Logistics',    price: 142.87, ema: 141.11, chg: +1.81, mcap: 'Mega', rating: 'BUY'  },
-    { t: 'SOLR',  n: 'Solera Solar',           price: 88.40,  ema: 104.20, chg: -3.32, mcap: 'Mega', rating: 'SELL' },
-    { t: 'PIVO',  n: 'Pivota Health',          price: 227.55, ema: 271.12, chg: -2.10, mcap: 'Mega', rating: 'SELL' },
-    { t: 'ECLO',  n: 'Eclora Pharma',          price: 156.78, ema: 188.92, chg: -1.54, mcap: 'Mega', rating: 'SELL' },
-    { t: 'OREN',  n: 'Orenda Foods',           price: 233.21, ema: 282.71, chg: -2.80, mcap: 'Mega', rating: 'SELL' },
-    { t: 'TUNDR', n: 'Tundra Materials',       price: 414.66, ema: 494.40, chg: -1.95, mcap: 'Mega', rating: 'SELL' },
+    { t: 'KLVR',  n: 'Kelvr Semiconductors',  price: 118.42, ema: 116.05, chg: +2.04, mcap: 'Mega', rating: 'BUY' },
+    { t: 'MAVN',  n: 'Maven Energy',           price: 364.20, ema: 358.97, chg: +1.95, mcap: 'Mega', rating: 'BUY' },
+    { t: 'BRDG',  n: 'Bridgepath Capital',     price: 291.10, ema: 289.40, chg: +1.90, mcap: 'Mega', rating: 'BUY' },
+    { t: 'AXIS',  n: 'Axis Robotics',          price: 203.40, ema: 199.85, chg: +1.78, mcap: 'Mega', rating: 'BUY' },
+    { t: 'NRTH',  n: 'Northwind Logistics',    price: 142.87, ema: 141.11, chg: +1.81, mcap: 'Mega', rating: 'BUY' },
   ];
 
   function hashColor(t) {
@@ -1001,7 +996,7 @@
       card.className = 'signal-card';
       card.dataset.idx = i;
       card.innerHTML = `
-        <div class="sc-rank mono">#${String(i + 1).padStart(2, '0')}${s.isBest ? ' <span class="badge-top">BEST</span>' : ''}</div>
+        <div class="sc-rank mono">#${String(i + 1).padStart(2, '0')}</div>
         <div class="sc-head">
           <div class="sc-logo" style="background:${hashColor(s.t)};color:var(--logo-fg)">${s.t.slice(0, 2)}</div>
           <div>
@@ -1586,10 +1581,26 @@
         unlockMember();
         const allRows = await window.allin.allSignals();
         if (allRows?.length) {
+          // Replace the card grid with the real top 10 BUY signals (sorted by confidence)
+          const top10 = allRows.filter(r => r.rating === 'BUY').slice(0, 10);
+          signals.length = 0;
+          top10.forEach(r => signals.push({
+            t: r.ticker,
+            n: r.company_name || r.ticker,
+            price: Number(r.price),
+            ema: Number(r.trend_base ?? r.price),
+            chg: Number(r.weekly_change ?? 0),
+            conf: Number(r.confidence ?? 0),
+            mcap: r.market_cap_band || 'Mega',
+            rating: r.rating || 'BUY',
+          }));
+          renderGrid();
+
           loadMemberTable(allRows);
           if (window.tickerSummary) {
             const memberSums = await window.tickerSummary.getTickerSummaries(allRows.map(r => r.ticker));
             Object.assign(summaries, memberSums);
+            renderGrid(); // Re-render top 10 cards with real sparklines
             loadMemberTable(allRows, memberSums);
           }
         }
