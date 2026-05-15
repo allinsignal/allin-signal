@@ -148,6 +148,20 @@
     <div class="log" id="oneLog"><span class="dim">Output will appear here…</span></div>
   </div>
 
+  <!-- ── Daily Scan ────────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-title">Run Daily Scan</div>
+    <div class="card-desc">
+      Fetches today's market data from Polygon, runs the signal model on all tickers,
+      applies the confidence gate, updates rankings, and syncs ETF flags.
+      Normally runs automatically after market close — use this to trigger it manually.
+    </div>
+    <div class="row">
+      <button class="btn btn-primary" id="runScanBtn">Run Daily Scan</button>
+    </div>
+    <div class="log" id="scanLog"><span class="dim">Output will appear here…</span></div>
+  </div>
+
   <!-- ── Full Backfill ──────────────────────────────────────────── -->
   <div class="card">
     <div class="card-title">SMA Backfill — All Active Tickers</div>
@@ -344,6 +358,24 @@ function initAdmin() {
     }
     running = false;
     backfillAllBtn.disabled = false;
+  });
+
+  // ── Daily scan ──────────────────────────────────────────────────
+  const runScanBtn = document.getElementById('runScanBtn');
+  const scanLog    = document.getElementById('scanLog');
+  runScanBtn.addEventListener('click', async () => {
+    runScanBtn.disabled = true;
+    scanLog.innerHTML = '';
+    log(scanLog, 'Starting daily scan…');
+    try {
+      const res = await callFn({ mode: 'scan' });
+      if (!res.ok) throw new Error(res.error || 'Scan failed');
+      log(scanLog, `✓ Scan complete for ${res.date}`, 'ok');
+      log(scanLog, `  ${res.tickers} tickers · ${res.buys} buys · ${res.flips} flips`, 'ok');
+    } catch (e) {
+      log(scanLog, `✗ ${e.message}`, 'warn');
+    }
+    runScanBtn.disabled = false;
   });
 
   // ── Apply confidence gate ────────────────────────────────────────

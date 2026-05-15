@@ -118,6 +118,9 @@ async function runScan() {
     // 5. Recompute sma_clean and is_top10 flags
     await supabase.rpc("update_top10_ranking");
 
+    // 6. Propagate is_etf flag from tickers → signals
+    await supabase.rpc("sync_etf_flags");
+
     await supabase.from("scan_runs").update({
       status: "success",
       finished_at: new Date().toISOString(),

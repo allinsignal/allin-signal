@@ -779,6 +779,7 @@
     <button class="filter active" data-filter="All">All</button>
     <button class="filter" data-filter="Buy">Buy</button>
     <button class="filter" data-filter="Sell">Sell</button>
+    <button class="filter" data-filter="ETF" style="margin-left:auto">ETFs</button>
   </div>
 </div>
 
@@ -1562,25 +1563,41 @@
   let activeTableFilter = 'All';
 
   function applyTableFilter() {
-    if (activeTableFilter === 'Buy') {
-      memberRows = allMemberRows.filter(r => r.rating === 'BUY');
-    } else if (activeTableFilter === 'Sell') {
-      memberRows = allMemberRows.filter(r => r.rating === 'SELL');
+    if (activeTableFilter === 'ETF') {
+      // ETF tab: show all ETFs, BUY first then SELL
+      const etfs = allMemberRows.filter(r => r.is_etf);
+      const etfBuys  = etfs.filter(r => r.rating === 'BUY');
+      const etfSells = etfs.filter(r => r.rating === 'SELL');
+      memberRows = [...etfBuys, ...etfSells];
     } else {
-      // All: BUY signals first (ranked by confidence), then SELL
-      const buys  = allMemberRows.filter(r => r.rating === 'BUY');
-      const sells = allMemberRows.filter(r => r.rating === 'SELL');
-      memberRows  = [...buys, ...sells];
+      // Stock tabs: always exclude ETFs
+      const stocks = allMemberRows.filter(r => !r.is_etf);
+      if (activeTableFilter === 'Buy') {
+        memberRows = stocks.filter(r => r.rating === 'BUY');
+      } else if (activeTableFilter === 'Sell') {
+        memberRows = stocks.filter(r => r.rating === 'SELL');
+      } else {
+        // All: BUY signals first (ranked by confidence), then SELL
+        const buys  = stocks.filter(r => r.rating === 'BUY');
+        const sells = stocks.filter(r => r.rating === 'SELL');
+        memberRows  = [...buys, ...sells];
+      }
     }
     currentPage = 0;
     renderTablePage();
   }
 
+  const sectionTitle = document.querySelector('.section-head h2');
   document.getElementById('tableFilters').querySelectorAll('.filter').forEach(btn => {
     btn.addEventListener('click', () => {
       document.getElementById('tableFilters').querySelectorAll('.filter').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       activeTableFilter = btn.dataset.filter;
+      if (sectionTitle) {
+        sectionTitle.innerHTML = activeTableFilter === 'ETF'
+          ? 'ETF signals · top funds tracked'
+          : `All buy signals · <span id="buyCount">${allMemberRows.filter(r => !r.is_etf).length.toLocaleString()}</span> tickers`;
+      }
       applyTableFilter();
     });
   });
@@ -1600,7 +1617,7 @@
       const p = Number(r.price), e = Number(r.trend_base ?? r.price);
       const distRaw = e > 0 ? (p - e) / e * 100 : 0;
       const isBuy = r.rating === 'BUY';
-      const isTopPick = isBuy && globalIdx < 10;
+      const isTopPick = isBuy && globalIdx < 10 && activeTableFilter !== 'ETF';
       if (isTopPick) topBuyCount++;
       const sum = memberSumsCache[r.ticker] || {};
       const ytdPct = sum.ytd_change;
@@ -1706,7 +1723,7 @@
           // Replace the card grid with the real top 10 BUY signals (sorted by confidence)
           // Sort: highest confidence first, then lowest volatility to break ties
           const top10 = allRows
-            .filter(r => r.rating === 'BUY' && r.sma_clean === true)
+            .filter(r => r.rating === 'BUY' && r.sma_clean === true && !r.is_etf)
             .sort((a, b) => (b.confidence - a.confidence) || ((a.volatility ?? 1) - (b.volatility ?? 1)))
             .slice(0, 10);
           signals.length = 0;
