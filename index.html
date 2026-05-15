@@ -1587,17 +1587,11 @@
     renderTablePage();
   }
 
-  const sectionTitle = document.querySelector('.section-head h2');
   document.getElementById('tableFilters').querySelectorAll('.filter').forEach(btn => {
     btn.addEventListener('click', () => {
       document.getElementById('tableFilters').querySelectorAll('.filter').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       activeTableFilter = btn.dataset.filter;
-      if (sectionTitle) {
-        sectionTitle.innerHTML = activeTableFilter === 'ETF'
-          ? 'ETF signals · top funds tracked'
-          : `All buy signals · <span id="buyCount">${allMemberRows.filter(r => !r.is_etf).length.toLocaleString()}</span> tickers`;
-      }
       applyTableFilter();
     });
   });
