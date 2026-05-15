@@ -90,8 +90,9 @@ async function allSignals(limit = 2000) {
   const { data, error } = await supabase
     .from('signals')
     .select('*')
-    .order('rating', { ascending: true })       // BUY before SELL
+    .order('rating', { ascending: true })        // BUY before SELL
     .order('confidence', { ascending: false })
+    .order('volatility', { ascending: true, nullsFirst: false }) // low vol wins ties
     .limit(limit);
   if (error) { console.warn('allSignals:', error); return []; }
   return data || [];

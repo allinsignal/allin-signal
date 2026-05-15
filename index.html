@@ -1582,7 +1582,11 @@
         const allRows = await window.allin.allSignals();
         if (allRows?.length) {
           // Replace the card grid with the real top 10 BUY signals (sorted by confidence)
-          const top10 = allRows.filter(r => r.rating === 'BUY').slice(0, 10);
+          // Sort: highest confidence first, then lowest volatility to break ties
+          const top10 = allRows
+            .filter(r => r.rating === 'BUY')
+            .sort((a, b) => (b.confidence - a.confidence) || ((a.volatility ?? 1) - (b.volatility ?? 1)))
+            .slice(0, 10);
           signals.length = 0;
           top10.forEach(r => signals.push({
             t: r.ticker,
