@@ -376,6 +376,24 @@
     border-color: var(--accent);
     box-shadow: 0 0 0 3px var(--accent-soft);
   }
+  .search-wrap { position: relative; flex: 1; }
+  .search-dropdown {
+    display: none; position: absolute; top: calc(100% + 8px); left: -18px; right: -18px;
+    background: var(--bg-1); border: 1px solid var(--line); border-radius: 10px;
+    box-shadow: 0 8px 24px oklch(0 0 0 / 0.3); z-index: 200; overflow: hidden;
+  }
+  .search-dropdown.open { display: block; }
+  .sd-item {
+    display: flex; align-items: center; gap: 12px; padding: 10px 16px; cursor: pointer;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .sd-item:last-child { border-bottom: none; }
+  .sd-item:hover, .sd-item.active { background: var(--bg-2); }
+  .sd-ticker { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 13px; min-width: 52px; color: var(--fg-0); }
+  .sd-name { font-size: 13px; color: var(--fg-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .sd-pill { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px; flex: none; }
+  .sd-pill.buy { background: var(--buy-soft); color: var(--buy); }
+  .sd-pill.sell { background: var(--sell-soft); color: var(--sell); }
   .search-bar .icon { color: var(--fg-2); flex: none; }
   .search-bar input {
     flex: 1; background: transparent; border: 0; color: var(--fg-0);
@@ -740,7 +758,10 @@
 <!-- Search bar -->
 <div class="search-bar" id="searchBar">
   <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-  <input placeholder="Search any ticker — AAPL, MSFT, NVDA, BRK.B…" id="lockedSearch" readonly autocomplete="off" />
+  <div class="search-wrap">
+    <input placeholder="Search ticker or company — AAPL, Apple, Microsoft…" id="lockedSearch" readonly autocomplete="off" />
+    <div class="search-dropdown" id="searchDropdown"></div>
+  </div>
   <span class="lock-tag">
     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>
     Members only
@@ -1421,32 +1442,114 @@
       searchBar.classList.add('unlocked');
       searchBar.querySelector('.lock-tag')?.remove();
 
+      const dropdown = document.getElementById('searchDropdown');
+      let activeIdx = -1;
+
+      function sigToCard(sig) {
+        return {
+          t: sig.ticker, n: sig.company_name || sig.ticker,
+          price: Number(sig.price), ema: Number(sig.trend_base ?? sig.price),
+          chg: Number(sig.weekly_change ?? 0), conf: Number(sig.confidence ?? 0),
+          mcap: sig.market_cap_band || 'Mid', rating: sig.rating || 'BUY',
+        };
+      }
+
+      function closeDropdown() {
+        dropdown.classList.remove('open');
+        dropdown.innerHTML = '';
+        activeIdx = -1;
+      }
+
+      function openResult(sig) {
+        closeDropdown();
+        newInput.value = sig.ticker;
+        openDrawer(sigToCard(sig), 0);
+      }
+
+      function renderDropdown(matches) {
+        if (!matches.length) { closeDropdown(); return; }
+        activeIdx = -1;
+        dropdown.innerHTML = matches.map((sig, i) =>
+          `<div class="sd-item" data-i="${i}">
+            <span class="sd-ticker">${sig.ticker}</span>
+            <span class="sd-name">${sig.company_name || ''}</span>
+            <span class="sd-pill ${sig.rating === 'BUY' ? 'buy' : 'sell'}">${sig.rating}</span>
+          </div>`
+        ).join('');
+        dropdown.classList.add('open');
+        dropdown.querySelectorAll('.sd-item').forEach((el, i) => {
+          el.addEventListener('mousedown', e => { e.preventDefault(); openResult(matches[i]); });
+        });
+      }
+
+      function queryLocal(q) {
+        if (!allMemberRows.length || q.length < 1) return [];
+        const lq = q.toLowerCase();
+        return allMemberRows
+          .filter(r =>
+            r.ticker.toLowerCase().startsWith(lq) ||
+            (r.company_name || '').toLowerCase().includes(lq)
+          )
+          .sort((a, b) => {
+            const aT = a.ticker.toLowerCase().startsWith(lq) ? 0 : 1;
+            const bT = b.ticker.toLowerCase().startsWith(lq) ? 0 : 1;
+            return aT - bT || a.ticker.localeCompare(b.ticker);
+          })
+          .slice(0, 8);
+      }
+
+      newInput.addEventListener('input', () => {
+        const q = newInput.value.trim();
+        if (q.length < 1) { closeDropdown(); return; }
+        renderDropdown(queryLocal(q));
+      });
+
+      newInput.addEventListener('keydown', e => {
+        const items = dropdown.querySelectorAll('.sd-item');
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          activeIdx = Math.min(activeIdx + 1, items.length - 1);
+          items.forEach((el, i) => el.classList.toggle('active', i === activeIdx));
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          activeIdx = Math.max(activeIdx - 1, -1);
+          items.forEach((el, i) => el.classList.toggle('active', i === activeIdx));
+        } else if (e.key === 'Escape') {
+          closeDropdown();
+        } else if (e.key === 'Enter') {
+          if (activeIdx >= 0 && items[activeIdx]) {
+            items[activeIdx].dispatchEvent(new MouseEvent('mousedown'));
+          } else {
+            doSearch();
+          }
+        }
+      });
+
+      document.addEventListener('click', e => {
+        if (!document.getElementById('searchBar').contains(e.target)) closeDropdown();
+      });
+
       async function doSearch() {
-        const ticker = newInput.value.trim().toUpperCase();
-        if (!ticker) return;
+        const q = newInput.value.trim();
+        if (!q) return;
+        // Try local first
+        const local = queryLocal(q);
+        if (local.length === 1) { openResult(local[0]); return; }
+        // Exact ticker fallback via DB
+        const ticker = q.toUpperCase();
         const btn = document.getElementById('searchBtn');
-        const orig = btn.textContent;
-        btn.textContent = '…';
-        btn.disabled = true;
+        btn.textContent = '…'; btn.disabled = true;
         const sig = await window.allin.searchSignal(ticker);
-        btn.textContent = orig;
-        btn.disabled = false;
+        btn.textContent = 'Search'; btn.disabled = false;
         if (sig) {
-          const s = {
-            t: sig.ticker, n: sig.company_name || sig.ticker,
-            price: Number(sig.price), ema: Number(sig.trend_base ?? sig.price),
-            chg: Number(sig.weekly_change ?? 0), conf: Number(sig.confidence ?? 0),
-            mcap: sig.market_cap_band || 'Mid', rating: sig.rating || 'BUY',
-          };
-          openDrawer(s, 0);
+          openResult(sig);
         } else {
           newInput.value = '';
-          newInput.placeholder = `"${ticker}" not found — check the symbol and try again`;
-          setTimeout(() => { newInput.placeholder = 'Search any ticker — AAPL, MSFT, NVDA, BRK.B…'; }, 3000);
+          newInput.placeholder = `"${q}" not found — try a ticker or company name`;
+          setTimeout(() => { newInput.placeholder = 'Search ticker or company — AAPL, Apple, Microsoft…'; }, 3000);
         }
       }
 
-      newInput.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
       document.getElementById('searchBtn').addEventListener('click', doSearch);
     }
   }
