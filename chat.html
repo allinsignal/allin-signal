@@ -1005,6 +1005,17 @@
     loadSignalsSidebar();
     initChat(profile);
 
+    // Pre-fill input if arriving from "Discuss" button on signals page
+    const hashTicker = window.location.hash.slice(1).toUpperCase();
+    if (hashTicker) {
+      // Wait for input to be rendered by initChat, then set value
+      setTimeout(() => {
+        const input = document.getElementById('chatInput');
+        if (input) { input.value = `$${hashTicker} `; input.focus(); }
+        history.replaceState(null, '', window.location.pathname);
+      }, 100);
+    }
+
     // Update topbar
     document.getElementById('signInBtn').style.display = 'none';
     const upgradeBtn = document.getElementById('topUpgrade');
