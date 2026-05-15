@@ -289,6 +289,50 @@ async function runBackfill() {
 }
 // =====================================================================
 
+// ====== ETF RECENT PRICE BACKFILL ====================================
+// Fetches the last 2 years of daily bars from Polygon for all active ETFs.
+// Fills the gap left by the 1000-bar plan limit so sparklines work.
+async function runEtfPriceBackfill() {
+  const { data: etfs } = await supabase
+    .from("tickers").select("ticker").eq("is_etf", true).eq("active", true);
+  if (!etfs?.length) return { ok: true, message: "No active ETFs" };
+
+  const from = new Date();
+  from.setFullYear(from.getFullYear() - 2);
+  const fromStr = from.toISOString().slice(0, 10);
+  const toStr   = new Date().toISOString().slice(0, 10);
+
+  const results: { ticker: string; bars: number }[] = [];
+  for (const { ticker } of etfs) {
+    try {
+      const url = `https://api.polygon.io/v2/aggs/ticker/${ticker}/range/1/day/${fromStr}/${toStr}?adjusted=true&sort=asc&limit=10000&apiKey=${POLYGON_KEY}`;
+      const res = await fetch(url);
+      if (!res.ok) { results.push({ ticker, bars: 0 }); continue; }
+      const json = await res.json();
+      const bars = (json.results || []).map((r: any) => ({
+        ticker,
+        trade_date: new Date(r.t).toISOString().slice(0, 10),
+        open: r.o, high: r.h, low: r.l, close: r.c, volume: r.v,
+      }));
+      for (let j = 0; j < bars.length; j += 1000) {
+        await supabase.from("price_history").upsert(bars.slice(j, j + 1000));
+      }
+      console.log(`ETF ${ticker}: ${bars.length} bars`);
+      results.push({ ticker, bars: bars.length });
+    } catch {
+      results.push({ ticker, bars: 0 });
+    }
+  }
+
+  return {
+    ok: true,
+    total: results.length,
+    succeeded: results.filter(r => r.bars > 0).length,
+    failed:    results.filter(r => r.bars === 0).length,
+  };
+}
+// =====================================================================
+
 const CORS = {
   "Access-Control-Allow-Origin":  "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -321,6 +365,8 @@ Deno.serve(async (req) => {
       );
     } else if (mode === "backfill") {
       result = await runBackfill();
+    } else if (mode === "etf_price_backfill") {
+      result = await runEtfPriceBackfill();
     } else {
       result = await runScan();
     }

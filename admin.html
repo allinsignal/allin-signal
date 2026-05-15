@@ -172,6 +172,7 @@
     </div>
     <div class="row">
       <button class="btn btn-primary" id="priceBackfillBtn">Run Price Backfill</button>
+      <button class="btn btn-primary" id="etfPriceBtn">Backfill ETF Recent Prices</button>
     </div>
     <div class="log" id="priceLog"><span class="dim">Output will appear here…</span></div>
   </div>
@@ -377,6 +378,21 @@ function initAdmin() {
   // ── Price history backfill (Polygon) ────────────────────────────
   const priceBackfillBtn = document.getElementById('priceBackfillBtn');
   const priceLog         = document.getElementById('priceLog');
+  document.getElementById('etfPriceBtn').addEventListener('click', async () => {
+    document.getElementById('etfPriceBtn').disabled = true;
+    priceLog.innerHTML = '';
+    log(priceLog, 'Fetching last 2 years of price data for all ETFs from Polygon…');
+    try {
+      const { ok, data } = await callFn({ mode: 'etf_price_backfill' });
+      if (!ok) throw new Error(data?.error || 'Failed');
+      log(priceLog, `✓ Done — ${data.succeeded} ETFs updated, ${data.failed} failed`, 'ok');
+      log(priceLog, 'Sparklines will now show correctly. You may need to hard-refresh the main site.', 'ok');
+    } catch (e) {
+      log(priceLog, `✗ ${e.message}`, 'warn');
+    }
+    document.getElementById('etfPriceBtn').disabled = false;
+  });
+
   priceBackfillBtn.addEventListener('click', async () => {
     priceBackfillBtn.disabled = true;
     priceLog.innerHTML = '';
