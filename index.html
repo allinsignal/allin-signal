@@ -725,10 +725,10 @@
   </div>
 </div>
 
-<!-- Section: Top 10 -->
+<!-- Section: Top picks -->
 <div class="section-head">
   <div>
-    <h2>Top 10 buy signals · highest-conviction picks today</h2>
+    <h2 id="topPicksHeading">Top 5 Free buy signals · highest-conviction picks today</h2>
     <div class="sub">The strongest fresh confirmations from this scan — ranked by Allin Signal strength.</div>
   </div>
 </div>
@@ -1380,6 +1380,10 @@
     // Hide paywall overlay
     const pw = document.querySelector('.paywall');
     if (pw) pw.style.display = 'none';
+
+    // Update top picks heading for members
+    const topPicksHeading = document.getElementById('topPicksHeading');
+    if (topPicksHeading) topPicksHeading.textContent = 'Top 10 buy signals · highest-conviction picks today';
 
     // Replace topbar subscribe button with member badge (strips event listeners)
     const topUpgradeBtn = document.getElementById('topUpgrade');
