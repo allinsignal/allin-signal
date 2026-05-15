@@ -143,6 +143,36 @@
   }
   .theme-toggle:hover { background: var(--bg-2); color: var(--fg-0); }
 
+  /* ---------- Hamburger / mobile nav ---------- */
+  .hamburger {
+    display: none; width: 40px; height: 40px; border-radius: 8px;
+    flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+    color: var(--fg-1); border: 1px solid var(--line-soft); flex: none;
+  }
+  .hamburger span { display: block; width: 18px; height: 2px; background: currentColor; border-radius: 2px; transition: transform 0.2s, opacity 0.2s; }
+  .hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+  .hamburger.open span:nth-child(2) { opacity: 0; }
+  .hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+  .mobile-nav {
+    display: none; position: fixed; top: 88px; left: 0; right: 0; bottom: 0; z-index: 48;
+    background: var(--bg-0); padding: 12px 16px;
+    flex-direction: column; gap: 2px;
+    border-top: 1px solid var(--line-soft); overflow-y: auto;
+  }
+  .mobile-nav.open { display: flex; }
+  .mobile-nav a {
+    padding: 14px 16px; border-radius: 10px; font-size: 16px; font-weight: 500;
+    color: var(--fg-1); display: block;
+  }
+  .mobile-nav a.active { color: var(--fg-0); background: var(--bg-2); }
+  .mobile-nav a:hover { color: var(--fg-0); background: var(--bg-1); }
+  .mobile-nav-divider { height: 1px; background: var(--line-soft); margin: 8px 0; }
+  .mobile-nav .mn-btn {
+    margin-top: 8px; padding: 14px 16px; border-radius: 10px; font-size: 15px; font-weight: 600;
+    text-align: center; background: var(--buy); color: var(--logo-fg); display: block;
+  }
+
   /* ---------- Hero ---------- */
   .hero {
     padding: 36px 32px 18px;
@@ -522,6 +552,8 @@
     .lt-row { grid-template-columns: 36px 1.4fr 1fr 1fr; }
     .lt-row > .hide-sm { display: none; }
     .modal { grid-template-columns: 1fr; }
+    .modal-left { display: none; }
+    .modal-right { padding: 22px; max-height: 85vh; overflow-y: auto; }
     .hero { padding: 24px 20px 16px; }
     .section-head { padding: 24px 20px 14px; flex-direction: column; align-items: start; gap: 12px; }
     .signal-grid { padding: 0 20px 12px; }
@@ -531,8 +563,62 @@
     footer { padding: 32px 20px 40px; }
   }
   @media (max-width: 500px) {
-    .signal-grid { grid-template-columns: 1fr; }
-    .nav .hide-mobile { display: none; }
+    /* Topbar */
+    .market-pill { display: none; }
+    .brand-name span { display: none; }
+    .nav { display: none; }
+    .hamburger { display: flex; }
+
+    /* Hero */
+    .hero h1 { font-size: 26px; }
+    .hero-stats { grid-template-columns: repeat(2, 1fr); }
+
+    /* Signal grid */
+    .signal-grid { grid-template-columns: 1fr; padding: 0 16px 12px; }
+    .section-head { padding: 20px 16px 12px; }
+    .locked-wrap { padding: 8px 16px 24px; }
+    .search-bar { margin: 0 16px 16px; }
+
+    /* Member table — rank + ticker + price only */
+    .lt-head { display: none; }
+    .lt-row { grid-template-columns: 32px 1fr auto; gap: 0 8px; padding: 10px 14px; }
+    .lt-row.top-pick { padding-left: 11px; }
+    .lt-row > :nth-child(4) { display: none; } /* trend base */
+    .pagination button { padding: 8px 16px; min-height: 40px; }
+
+    /* Drawer — bottom sheet */
+    .drawer {
+      width: 100%; max-width: 100%;
+      top: auto; height: 90svh;
+      border-left: none; border-top: 1px solid var(--line);
+      border-radius: 20px 20px 0 0;
+      transform: translateY(100%);
+    }
+    .drawer.open { transform: translateY(0); }
+    .drawer-grid { grid-template-columns: 1fr; }
+    .drawer-close { width: 40px; height: 40px; }
+    .drawer-head { padding: 14px 18px; }
+    .drawer-body { padding: 16px 18px 20px; }
+    .drawer-foot { padding: 12px 18px; }
+
+    /* Modal — bottom sheet */
+    .modal-scrim { place-items: end; }
+    .modal {
+      width: 100%; max-width: 100%; border-radius: 20px 20px 0 0;
+      max-height: 90svh; overflow-y: auto;
+    }
+    .modal-left { display: none; }
+    .modal-right { padding: 20px; max-height: none; }
+    .row2 { grid-template-columns: 1fr; }
+    .pay-tabs { grid-template-columns: 1fr 1fr; }
+    .modal-close { width: 40px; height: 40px; }
+
+    /* Paywall card */
+    .perks { grid-template-columns: 1fr; }
+    .paywall-card { padding: 18px 18px; }
+
+    /* Footer */
+    footer { flex-direction: column; gap: 20px; }
   }
 </style>
 </head>
@@ -556,10 +642,24 @@
     <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme" title="Toggle light/dark">
       <svg id="themeIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>
     </button>
-    <button class="btn-ghost">Sign in</button>
+    <button class="btn-ghost" id="signInBtn">Sign in</button>
     <button class="btn-primary" id="topUpgrade">Subscribe · $3/mo</button>
+    <button class="hamburger" id="hamburger" aria-label="Open menu" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
   </div>
 </header>
+
+<!-- Mobile nav overlay -->
+<nav class="mobile-nav" id="mobileNav">
+  <a href="#" class="active">Signals</a>
+  <a href="methodology.html">Methodology</a>
+  <a href="watchlist.html">Watchlist</a>
+  <a href="pricing.html">Pricing</a>
+  <a href="chat.html">Chat</a>
+  <div class="mobile-nav-divider"></div>
+  <a href="pricing.html" class="mn-btn">Subscribe · $3/mo</a>
+</nav>
 
 <!-- Ticker banner -->
 <div class="ticker-banner" id="tickerBanner">
@@ -1242,6 +1342,24 @@
     document.documentElement.setAttribute('data-theme', next);
     try { localStorage.setItem('allin-theme', next); } catch(e) {}
     updateThemeIcon();
+  });
+
+  // ---- Hamburger menu ----
+  const hamburger  = document.getElementById('hamburger');
+  const mobileNav  = document.getElementById('mobileNav');
+  hamburger.addEventListener('click', () => {
+    const open = mobileNav.classList.toggle('open');
+    hamburger.classList.toggle('open', open);
+    hamburger.setAttribute('aria-expanded', open);
+    document.body.style.overflow = open ? 'hidden' : '';
+  });
+  mobileNav.querySelectorAll('a').forEach(a => {
+    a.addEventListener('click', () => {
+      mobileNav.classList.remove('open');
+      hamburger.classList.remove('open');
+      hamburger.setAttribute('aria-expanded', 'false');
+      document.body.style.overflow = '';
+    });
   });
 
   // ---- Keyboard shortcuts ----
