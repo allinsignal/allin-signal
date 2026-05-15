@@ -290,43 +290,56 @@ async function runBackfill() {
 // =====================================================================
 
 // ====== ETF RECENT PRICE BACKFILL ====================================
-// Fetches the last 2 years of daily bars from Polygon for all active ETFs.
-// Fills the gap left by the 1000-bar plan limit so sparklines work.
+// Fetches 10 years of daily closes from Yahoo Finance for all active ETFs
+// and writes them to price_history so sparklines and YTD work correctly.
 async function runEtfPriceBackfill() {
   const { data: etfs } = await supabase
     .from("tickers").select("ticker").eq("is_etf", true).eq("active", true);
   if (!etfs?.length) return { ok: true, message: "No active ETFs" };
 
-  const from = new Date();
-  from.setFullYear(from.getFullYear() - 2);
-  const fromStr = from.toISOString().slice(0, 10);
-  const toStr   = new Date().toISOString().slice(0, 10);
+  const results: { ticker: string; bars: number; error?: string }[] = [];
 
-  const results: { ticker: string; bars: number }[] = [];
   for (const { ticker } of etfs) {
     try {
-      const url = `https://api.polygon.io/v2/aggs/ticker/${ticker}/range/1/day/${fromStr}/${toStr}?adjusted=true&sort=asc&limit=10000&apiKey=${POLYGON_KEY}`;
-      const res = await fetch(url);
-      if (!res.ok) { results.push({ ticker, bars: 0 }); continue; }
-      const json = await res.json();
-      const bars = (json.results || []).map((r: any) => ({
-        ticker,
-        trade_date: new Date(r.t).toISOString().slice(0, 10),
-        open: r.o, high: r.h, low: r.l, close: r.c, volume: r.v,
-      }));
-      for (let j = 0; j < bars.length; j += 1000) {
-        await supabase.from("price_history").upsert(bars.slice(j, j + 1000));
+      const url = `https://query2.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=10y`;
+      const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
+      if (!res.ok) { results.push({ ticker, bars: 0, error: `HTTP ${res.status}` }); continue; }
+
+      const json   = await res.json();
+      const result = json?.chart?.result?.[0];
+      if (!result) { results.push({ ticker, bars: 0, error: "no data" }); continue; }
+
+      const timestamps: number[] = result.timestamp || [];
+      const ohlcv = result.indicators?.quote?.[0] || {};
+
+      const bars: { ticker: string; trade_date: string; open: number; high: number; low: number; close: number; volume: number }[] = [];
+      for (let i = 0; i < timestamps.length; i++) {
+        if (ohlcv.close?.[i] == null) continue;
+        bars.push({
+          ticker,
+          trade_date: new Date(timestamps[i] * 1000).toISOString().slice(0, 10),
+          open:   ohlcv.open?.[i]   ?? ohlcv.close[i],
+          high:   ohlcv.high?.[i]   ?? ohlcv.close[i],
+          low:    ohlcv.low?.[i]    ?? ohlcv.close[i],
+          close:  ohlcv.close[i],
+          volume: ohlcv.volume?.[i] ?? 0,
+        });
       }
-      console.log(`ETF ${ticker}: ${bars.length} bars`);
+
+      for (let j = 0; j < bars.length; j += 500) {
+        await supabase.from("price_history").upsert(bars.slice(j, j + 500));
+      }
+      console.log(`Yahoo ETF ${ticker}: ${bars.length} bars`);
       results.push({ ticker, bars: bars.length });
-    } catch {
-      results.push({ ticker, bars: 0 });
+    } catch (e) {
+      results.push({ ticker, bars: 0, error: String(e) });
     }
+    await new Promise(r => setTimeout(r, 300));
   }
 
   return {
     ok: true,
-    total: results.length,
+    total:     results.length,
     succeeded: results.filter(r => r.bars > 0).length,
     failed:    results.filter(r => r.bars === 0).length,
   };
