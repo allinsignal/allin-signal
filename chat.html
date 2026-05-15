@@ -660,13 +660,21 @@
       sendBtn.addEventListener('click', sendMessage);
     }
 
-    // Load last 200 messages (keep all data in DB, cap UI display)
+    // Load today's messages only — resets at midnight automatically
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
     const { data: history } = await window.allin.supabase
       .from('messages')
       .select('*')
+      .gte('created_at', todayStart.toISOString())
       .order('created_at', { ascending: false })
       .limit(200)
       .then(r => ({ ...r, data: r.data?.reverse() }));
+
+    // Auto-reload at midnight so the chat clears for the new day
+    const msUntilMidnight = new Date(todayStart.getTime() + 86400000) - Date.now();
+    setTimeout(() => location.reload(), msUntilMidnight);
 
     // Pre-load roles for all message senders so badges render correctly
     if (history?.length) {
