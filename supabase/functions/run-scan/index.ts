@@ -283,7 +283,15 @@ async function runBackfill() {
 }
 // =====================================================================
 
+const CORS = {
+  "Access-Control-Allow-Origin":  "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+
   // Parse body robustly — req.json() can silently fail in some invocation contexts
   let mode = "scan";
   let body: Record<string, unknown> = {};
@@ -311,14 +319,14 @@ Deno.serve(async (req) => {
       result = await runScan();
     }
     return new Response(JSON.stringify(result), {
-      headers: { "Content-Type": "application/json" },
+      headers: { ...CORS, "Content-Type": "application/json" },
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     const stack = e instanceof Error ? e.stack : undefined;
     console.error(`run-scan error (mode=${mode}):`, msg, stack);
     return new Response(JSON.stringify({ error: msg, stack, mode }), {
-      status: 500, headers: { "Content-Type": "application/json" },
+      status: 500, headers: { ...CORS, "Content-Type": "application/json" },
     });
   }
 });
