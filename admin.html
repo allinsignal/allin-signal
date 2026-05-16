@@ -177,6 +177,19 @@
     <div class="log" id="priceLog"><span class="dim">Output will appear here…</span></div>
   </div>
 
+  <!-- ── Company Info Backfill ─────────────────────────────────── -->
+  <div class="card">
+    <div class="card-title">Company Info — Populate from Polygon</div>
+    <div class="card-desc">
+      Fetches sector, industry, and company description from Polygon for all stocks
+      missing that data. Runs in batches of 50 — click repeatedly until done.
+    </div>
+    <div class="row">
+      <button class="btn btn-primary" id="companyInfoBtn">Populate Company Info</button>
+    </div>
+    <div class="log" id="companyInfoLog"><span class="dim">Output will appear here…</span></div>
+  </div>
+
   <!-- ── Full Backfill ──────────────────────────────────────────── -->
   <div class="card">
     <div class="card-title">SMA Backfill — All Active Tickers</div>
@@ -373,6 +386,31 @@ function initAdmin() {
     }
     running = false;
     backfillAllBtn.disabled = false;
+  });
+
+  // ── Company info backfill ────────────────────────────────────────
+  const companyInfoBtn = document.getElementById('companyInfoBtn');
+  const companyInfoLog = document.getElementById('companyInfoLog');
+  let companyInfoOffset = 0;
+  companyInfoBtn.addEventListener('click', async () => {
+    companyInfoBtn.disabled = true;
+    log(companyInfoLog, `Fetching company info (batch offset ${companyInfoOffset})…`);
+    try {
+      const { ok, data } = await callFn({ mode: 'populate_company_info', limit: 50, offset: companyInfoOffset });
+      if (!ok) throw new Error(data?.error || 'Failed');
+      if (data.message) {
+        log(companyInfoLog, `✓ ${data.message}`, 'ok');
+        companyInfoOffset = 0;
+      } else {
+        log(companyInfoLog, `✓ Batch done — ${data.succeeded} updated, ${data.failed} failed. Next offset: ${data.next_offset}`, 'ok');
+        companyInfoOffset = data.next_offset;
+        if (data.total === 50) log(companyInfoLog, 'More tickers remaining — click again to continue.', '');
+        else { log(companyInfoLog, 'All done!', 'ok'); companyInfoOffset = 0; }
+      }
+    } catch (e) {
+      log(companyInfoLog, `✗ ${e.message}`, 'warn');
+    }
+    companyInfoBtn.disabled = false;
   });
 
   // ── Price history backfill (Polygon) ────────────────────────────

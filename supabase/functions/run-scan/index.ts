@@ -314,8 +314,39 @@ async function fetchCompanyInfo(ticker: string) {
       }
     }
   } catch (_) {}
-
   return { error: "no data" };
+}
+
+// Batch-populate company info for all active tickers from Polygon
+async function populateCompanyInfo(limit = 50, offset = 0) {
+  const { data: universe } = await supabase
+    .from("tickers")
+    .select("ticker")
+    .eq("active", true)
+    .is("description", null)   // only tickers missing info
+    .order("ticker")
+    .range(offset, offset + limit - 1);
+
+  if (!universe?.length) return { ok: true, message: "All tickers already have company info", total: 0 };
+
+  let succeeded = 0, failed = 0;
+  for (const { ticker } of universe) {
+    const info = await fetchCompanyInfo(ticker);
+    if (!info.error) {
+      await supabase.from("tickers").update({
+        sector:      info.sector,
+        industry:    info.industry,
+        description: info.description,
+        website:     info.website,
+      }).eq("ticker", ticker);
+      succeeded++;
+    } else {
+      failed++;
+    }
+    await new Promise(r => setTimeout(r, 150)); // polite Polygon rate limit
+  }
+
+  return { ok: true, total: universe.length, succeeded, failed, next_offset: offset + limit };
 }
 // =====================================================================
 
@@ -412,6 +443,11 @@ Deno.serve(async (req) => {
       result = await runEtfPriceBackfill();
     } else if (mode === "company_info") {
       result = await fetchCompanyInfo((body.ticker as string || "").toUpperCase());
+    } else if (mode === "populate_company_info") {
+      result = await populateCompanyInfo(
+        (body.limit  as number | undefined) ?? 50,
+        (body.offset as number | undefined) ?? 0,
+      );
     } else {
       result = await runScan();
     }
