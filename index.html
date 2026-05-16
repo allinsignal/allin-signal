@@ -1152,7 +1152,7 @@
       ? `Signal strength ${dist.toFixed(2)}% — below the trend baseline.`
       : `Signal strength +${dist.toFixed(2)}% — within the high-conviction zone.`;
 
-    // Company info — seed with what we already have, then enrich from Yahoo
+    // Company info — query directly from tickers table
     const tagsEl = document.getElementById('dCompanyTags');
     const descEl = document.getElementById('dCompanyDesc');
     tagsEl.innerHTML = '';
@@ -1163,27 +1163,28 @@
       t.textContent = s.mcap + ' Cap';
       tagsEl.appendChild(t);
     }
-    fetch('https://ojmbqmbiyjpokhspcjbs.supabase.co/functions/v1/run-scan', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ANON_KEY}` },
-      body: JSON.stringify({ mode: 'company_info', ticker: s.t }),
-    })
-    .then(r => r.json())
-    .then(p => {
-      if (!p || p.error) return;
-      ['sector', 'industry'].forEach(key => {
-        if (p[key]) {
-          const tag = document.createElement('span');
-          tag.className = 'co-tag';
-          tag.textContent = p[key];
-          tagsEl.appendChild(tag);
-        }
-      });
-      if (p.description) {
-        descEl.textContent = p.description.length > 420 ? p.description.slice(0, 420) + '…' : p.description;
-      }
-    })
-    .catch(() => {});
+    if (window.allin?.supabase) {
+      window.allin.supabase
+        .from('tickers')
+        .select('sector, industry, description, website')
+        .eq('ticker', s.t)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (!data) return;
+          ['sector', 'industry'].forEach(key => {
+            if (data[key]) {
+              const tag = document.createElement('span');
+              tag.className = 'co-tag';
+              tag.textContent = data[key];
+              tagsEl.appendChild(tag);
+            }
+          });
+          if (data.description) {
+            const txt = data.description;
+            descEl.textContent = txt.length > 420 ? txt.slice(0, 420) + '…' : txt;
+          }
+        });
+    }
 
     const chart = document.getElementById('dChart');
     const sparkPrices = summaries[s.t]?.spark;
