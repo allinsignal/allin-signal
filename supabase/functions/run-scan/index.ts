@@ -445,7 +445,7 @@ Deno.serve(async (req) => {
       result = await fetchCompanyInfo((body.ticker as string || "").toUpperCase());
     } else if (mode === "populate_company_info") {
       result = await populateCompanyInfo(
-        (body.limit  as number | undefined) ?? 50,
+        (body.limit  as number | undefined) ?? 200,
         (body.offset as number | undefined) ?? 0,
       );
     } else {
