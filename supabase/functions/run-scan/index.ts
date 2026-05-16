@@ -291,20 +291,44 @@ async function runBackfill() {
 
 // ====== COMPANY INFO PROXY ===========================================
 async function fetchCompanyInfo(ticker: string) {
-  const url = `https://api.polygon.io/v3/reference/tickers/${ticker}?apiKey=${POLYGON_KEY}`;
-  const res = await fetch(url);
-  if (!res.ok) return { error: `Polygon ${res.status}` };
-  const json = await res.json();
-  const r = json?.results;
-  if (!r) return { error: "no data" };
-  return {
-    sector:      r.sic_description || null,
-    industry:    r.type            || null,
-    description: r.description     || null,
-    employees:   r.total_employees || null,
-    country:     r.locale          || null,
-    website:     r.homepage_url    || null,
-  };
+  // Try Polygon first (works well for stocks)
+  try {
+    const res = await fetch(`https://api.polygon.io/v3/reference/tickers/${ticker}?apiKey=${POLYGON_KEY}`);
+    if (res.ok) {
+      const json = await res.json();
+      const r = json?.results;
+      if (r?.description) {
+        return {
+          sector:      r.sic_description || null,
+          industry:    r.type !== "ETF" ? r.type : null,
+          description: r.description,
+          website:     r.homepage_url || null,
+        };
+      }
+    }
+  } catch (_) {}
+
+  // Fall back to Yahoo Finance (works better for ETFs)
+  try {
+    const res = await fetch(
+      `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=assetProfile`,
+      { headers: { "User-Agent": "Mozilla/5.0" } }
+    );
+    if (res.ok) {
+      const json = await res.json();
+      const p = json?.quoteSummary?.result?.[0]?.assetProfile;
+      if (p) {
+        return {
+          sector:      p.sector   || null,
+          industry:    p.industry || null,
+          description: p.longBusinessSummary || null,
+          website:     p.website  || null,
+        };
+      }
+    }
+  } catch (_) {}
+
+  return { error: "no data" };
 }
 // =====================================================================
 
