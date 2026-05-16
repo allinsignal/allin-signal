@@ -291,19 +291,19 @@ async function runBackfill() {
 
 // ====== COMPANY INFO PROXY ===========================================
 async function fetchCompanyInfo(ticker: string) {
-  const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=assetProfile`;
-  const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
-  if (!res.ok) return { error: `Yahoo ${res.status}` };
+  const url = `https://api.polygon.io/v3/reference/tickers/${ticker}?apiKey=${POLYGON_KEY}`;
+  const res = await fetch(url);
+  if (!res.ok) return { error: `Polygon ${res.status}` };
   const json = await res.json();
-  const p = json?.quoteSummary?.result?.[0]?.assetProfile;
-  if (!p) return { error: "no data" };
+  const r = json?.results;
+  if (!r) return { error: "no data" };
   return {
-    sector:      p.sector      || null,
-    industry:    p.industry    || null,
-    description: p.longBusinessSummary || null,
-    employees:   p.fullTimeEmployees   || null,
-    country:     p.country     || null,
-    website:     p.website     || null,
+    sector:      r.sic_description || null,
+    industry:    r.type            || null,
+    description: r.description     || null,
+    employees:   r.total_employees || null,
+    country:     r.locale          || null,
+    website:     r.homepage_url    || null,
   };
 }
 // =====================================================================
