@@ -1163,13 +1163,14 @@
       t.textContent = s.mcap + ' Cap';
       tagsEl.appendChild(t);
     }
-    fetch(`https://query2.finance.yahoo.com/v10/finance/quoteSummary/${s.t}?modules=assetProfile`, {
-      headers: { 'User-Agent': 'Mozilla/5.0' }
+    fetch('https://ojmbqmbiyjpokhspcjbs.supabase.co/functions/v1/run-scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ANON_KEY}` },
+      body: JSON.stringify({ mode: 'company_info', ticker: s.t }),
     })
     .then(r => r.json())
-    .then(json => {
-      const p = json?.quoteSummary?.result?.[0]?.assetProfile;
-      if (!p) return;
+    .then(p => {
+      if (!p || p.error) return;
       ['sector', 'industry'].forEach(key => {
         if (p[key]) {
           const tag = document.createElement('span');
@@ -1178,9 +1179,8 @@
           tagsEl.appendChild(tag);
         }
       });
-      if (p.longBusinessSummary) {
-        const txt = p.longBusinessSummary;
-        descEl.textContent = txt.length > 420 ? txt.slice(0, 420) + '…' : txt;
+      if (p.description) {
+        descEl.textContent = p.description.length > 420 ? p.description.slice(0, 420) + '…' : p.description;
       }
     })
     .catch(() => {});

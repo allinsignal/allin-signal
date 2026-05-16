@@ -289,6 +289,25 @@ async function runBackfill() {
 }
 // =====================================================================
 
+// ====== COMPANY INFO PROXY ===========================================
+async function fetchCompanyInfo(ticker: string) {
+  const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=assetProfile`;
+  const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
+  if (!res.ok) return { error: `Yahoo ${res.status}` };
+  const json = await res.json();
+  const p = json?.quoteSummary?.result?.[0]?.assetProfile;
+  if (!p) return { error: "no data" };
+  return {
+    sector:      p.sector      || null,
+    industry:    p.industry    || null,
+    description: p.longBusinessSummary || null,
+    employees:   p.fullTimeEmployees   || null,
+    country:     p.country     || null,
+    website:     p.website     || null,
+  };
+}
+// =====================================================================
+
 // ====== ETF RECENT PRICE BACKFILL ====================================
 // Fetches 10 years of daily closes from Yahoo Finance for all active ETFs
 // and writes them to price_history so sparklines and YTD work correctly.
@@ -380,6 +399,8 @@ Deno.serve(async (req) => {
       result = await runBackfill();
     } else if (mode === "etf_price_backfill") {
       result = await runEtfPriceBackfill();
+    } else if (mode === "company_info") {
+      result = await fetchCompanyInfo((body.ticker as string || "").toUpperCase());
     } else {
       result = await runScan();
     }
