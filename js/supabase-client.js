@@ -195,14 +195,19 @@ async function recentChanges(limit = 200) {
     .limit(limit);
   if (error) { console.warn('recentChanges:', error); return []; }
   if (!data?.length) return [];
-  // Enrich with company name + confidence from signals
+  // Enrich with company name, confidence, and current price from signals
   const tickers = [...new Set(data.map(r => r.ticker))];
   const { data: sigs } = await supabase
-    .from('signals').select('ticker, company_name, confidence')
+    .from('signals').select('ticker, company_name, confidence, price')
     .in('ticker', tickers);
   const sigMap = {};
   if (sigs) sigs.forEach(s => { sigMap[s.ticker] = s; });
-  return data.map(r => ({ ...r, company_name: sigMap[r.ticker]?.company_name || r.ticker, confidence: sigMap[r.ticker]?.confidence ?? null }));
+  return data.map(r => ({
+    ...r,
+    company_name:   sigMap[r.ticker]?.company_name  || r.ticker,
+    confidence:     sigMap[r.ticker]?.confidence    ?? null,
+    current_price:  sigMap[r.ticker]?.price         ?? null,
+  }));
 }
 
 // ----- Expose globally -----------------------------------------------

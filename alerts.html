@@ -132,6 +132,14 @@
   .change-badge.sell-badge { background: var(--sell-soft); color: var(--sell); }
   .conf-text { font-size: 11px; color: var(--fg-2); font-family: 'JetBrains Mono', monospace; }
   .card-time { font-size: 11px; color: var(--fg-3); margin-left: auto; white-space: nowrap; }
+  .card-prices { display: flex; align-items: center; gap: 14px; margin-top: 8px; font-size: 12px; font-family: 'JetBrains Mono', monospace; }
+  .card-prices .p-label { color: var(--fg-3); font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1px; }
+  .card-prices .p-val { color: var(--fg-0); font-weight: 600; }
+  .card-prices .p-group { display: flex; flex-direction: column; }
+  .card-prices .p-divider { width: 1px; height: 28px; background: var(--line-soft); }
+  .card-prices .p-chg { font-weight: 600; }
+  .card-prices .p-chg.up { color: var(--buy); }
+  .card-prices .p-chg.dn { color: var(--sell); }
 
   /* Card action buttons */
   .card-actions { display: flex; gap: 6px; margin-top: 10px; }
@@ -388,6 +396,26 @@
       const inits      = initials(alert.ticker);
       const companyName = alert.company_name || alert.ticker;
 
+      // Price tracking
+      let pricesHtml = '';
+      if (alert.price_at_alert != null) {
+        const alertPrice   = Number(alert.price_at_alert);
+        const currentPrice = alert.current_price != null ? Number(alert.current_price) : null;
+        const pct          = currentPrice != null ? ((currentPrice - alertPrice) / alertPrice * 100) : null;
+        const pctHtml      = pct != null
+          ? `<div class="p-group"><div class="p-label">Since alert</div><div class="p-chg ${pct >= 0 ? 'up' : 'dn'}">${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%</div></div>`
+          : '';
+        const currHtml     = currentPrice != null
+          ? `<div class="p-divider"></div><div class="p-group"><div class="p-label">Current</div><div class="p-val">$${currentPrice.toFixed(2)}</div></div>`
+          : '';
+        pricesHtml = `<div class="card-prices">
+          <div class="p-group"><div class="p-label">Alert price</div><div class="p-val">$${alertPrice.toFixed(2)}</div></div>
+          ${currHtml}
+          ${pct != null ? '<div class="p-divider"></div>' : ''}
+          ${pctHtml}
+        </div>`;
+      }
+
       html += `
         <div class="alert-card ${flipClass}" data-ticker="${escHtml(alert.ticker)}" role="button" tabindex="0" aria-label="${changeText} for ${alert.ticker}">
           <div class="logo-circle" style="background:${color}">${escHtml(inits)}</div>
@@ -402,6 +430,7 @@
               ${confText ? `<span class="conf-text">${escHtml(confText)}</span>` : ''}
               <span class="card-time">${fmtDateTime(alert.changed_at)}</span>
             </div>
+            ${pricesHtml}
             <div class="card-actions">
               <button class="card-action-btn tv-btn" data-ticker="${escHtml(alert.ticker)}">
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
