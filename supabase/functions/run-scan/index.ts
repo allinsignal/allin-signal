@@ -290,39 +290,26 @@ async function runBackfill() {
 // =====================================================================
 
 // ====== COMPANY INFO PROXY ===========================================
-async function fetchCompanyInfo(ticker: string) {
-  // Try Polygon first (works well for stocks)
-  try {
-    const res = await fetch(`https://api.polygon.io/v3/reference/tickers/${ticker}?apiKey=${POLYGON_KEY}`);
-    if (res.ok) {
-      const json = await res.json();
-      const r = json?.results;
-      if (r?.description) {
-        return {
-          sector:      r.sic_description || null,
-          industry:    r.type !== "ETF" ? r.type : null,
-          description: r.description,
-          website:     r.homepage_url || null,
-        };
-      }
-    }
-  } catch (_) {}
+function fetchWithTimeout(url: string, opts: RequestInit = {}, ms = 4000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  return fetch(url, { ...opts, signal: controller.signal }).finally(() => clearTimeout(timer));
+}
 
-  // Fall back to Yahoo Finance (works better for ETFs)
+async function fetchCompanyInfo(ticker: string) {
   try {
-    const res = await fetch(
-      `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=assetProfile`,
-      { headers: { "User-Agent": "Mozilla/5.0" } }
+    const res = await fetchWithTimeout(
+      `https://api.polygon.io/v3/reference/tickers/${ticker}?apiKey=${POLYGON_KEY}`
     );
     if (res.ok) {
       const json = await res.json();
-      const p = json?.quoteSummary?.result?.[0]?.assetProfile;
-      if (p) {
+      const r = json?.results;
+      if (r) {
         return {
-          sector:      p.sector   || null,
-          industry:    p.industry || null,
-          description: p.longBusinessSummary || null,
-          website:     p.website  || null,
+          sector:      r.sic_description || (r.type === "ETF" ? "Exchange Traded Fund" : null),
+          industry:    r.type === "ETF" ? null : (r.type || null),
+          description: r.description || null,
+          website:     r.homepage_url || null,
         };
       }
     }
